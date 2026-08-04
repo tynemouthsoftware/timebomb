@@ -2,7 +2,7 @@
 ; Timebomb
 ; Based on BASIC type in program in Compute! July 1983 by Doug Smoak
 ; Dave Curran 2024-06-12
-; Revised 2026-01-13, 2026-07-19, 2026-07-31
+; Revised 2026-01-13, 2026-07-19, 2026-07-31, 2026-08-03
 ;===================================================================================================
 
 ; ACME.exe timebomb.asm
@@ -25,276 +25,326 @@ end_of_stub
     !word 0                             ; end of BASIC stub
 
 ;===================================================================================================
-; Starting point
+; Initialise
 ;===================================================================================================
-; start:
     lda VIA1_TIMER2_LSB                 ; seed RND from the VIA timer
     sta SEED_LSB
     lda VIA1_TIMER2_MSB
     sta SEED_MSB
 
-L1:
+start:
     ldy #0                              ; (leave Y as 0)
 
-; some variables that are initialised to 0 by BASIC
-    sty F                               ; f = 0
-    sty R_UNITS                         ; r = 0
-    sty R_TENS                          ;
-    sty K_UNITS                         ; k = 0
-    sty K_TENS                          ; 
+    sty FOUND                           ; not found
+    sty ROUND_UNITS                     ; rount 0
+    sty ROUND_TENS                      ;
+    sty TIMER_UNITS                     ; timer 0
+    sty TIMER_TENS                      ;
+    sty PENALTY                         ; no penalty to start with
 
-; 2 poke 56, 24 : poke 55, 103 : gosub 29
-    ; set memory limits, normally $1E00 to $1867
-    ; stops the BASIC heap getting in the way of the maze - not required
-    ; gosub 29 not required as that pokes assembler from data statments into the cassette buffer
-
-; 3 d = 37154 : p1 = d-3 : p2 = d-2 : df = 30720 : v = 36878 : s = v-4 : m1 = 30 : x = 50 : goto 19
-; d  = constant = 37154 = 9122 = VIA#2 DDRB (keyboard column scan + joy3)
-; p1 = constant = 37151 = 911F = VIA#1 PortA (joy0,1,2,fire)
-; p2 = constant = 37152 = 9120 = VIA#2 PortB (joy3)
-; df = constant = 30720 = 7800 = display offset
-; v  = constant = 36878 = 900E = VIC volume / aux colour
-; s  = constant = 36874 = 900A = VIC oscillator 1 frequency
-L3:
-    lda #CHAR_UP                        ; m1 = 30 = ^
-    sta M1
-
-    lda #5                              ; x = 50
-    sta X_TENS                          ; Tens and units stored separately to avoid several divide by 10s
-                                        ; (X_UNITS is always 0, so is optimised out)
+    lda #CHAR_UP                        ; Initial player character facing North
+    sta PLAYER_CHARACTER
 
 ;===================================================================================================
-; Draw the maze
+; Prepare the data structures
 ;===================================================================================================
-; 19 dim a(3) : a(0) = 2 : a(1) = -44 : a(2) = -2 : a(3) = 44 : wl = 209 : hl = 32 : sc = 6228 : a9 = 6943
-L19:
-; a = 2, -44, -2, 44
-    lda #2
-    sta ARRAY
-    lda #-44
-    sta ARRAY+1
-    lda #-2
-    sta ARRAY+2
-    lda #44
-    sta ARRAY+3
 
-; also create a half value version to avoid having to recalculate each time
-    lda #1
-    sta ARRAY_HALF
-    lda #-22
-    sta ARRAY_HALF+1
-    lda #-1
-    sta ARRAY_HALF+2
-    lda #22
-    sta ARRAY_HALF+3
+; All arrays are indexed on direction
+    ; 0 = right
+    ; 1 = up
+    ; 2 = left
+    ; 3 = down
 
-; 20 sys 861 : print "{clear} {down}making maze"
-; wl=209 - constant "Wall" (inverse circle)
-; hl=32 - constant "Hall" (space)
-; sc=6228
-    lda #<MAZE_TOP                      ; set SC and DST to 6228 ($1854), the top of the maze
+; Build the single direction array
+    lda #MOVE_RIGHT
+    sta DIRECTION
+    lda #MOVE_UP
+    sta DIRECTION + 1
+    lda #MOVE_LEFT
+    sta DIRECTION + 2
+    lda #MOVE_DOWN
+    sta DIRECTION + 3
+
+; Build the double direction array
+    lda #2*MOVE_RIGHT
+    sta DOUBLE_DIRECTION
+    lda #2*MOVE_UP
+    sta DOUBLE_DIRECTION + 1
+    lda #2*MOVE_LEFT
+    sta DOUBLE_DIRECTION + 2
+    lda #2*MOVE_DOWN
+    sta DOUBLE_DIRECTION + 3
+
+; build the direction character array
+    lda #CHAR_RIGHT
+    sta CHAR_DIRECTION
+    lda #CHAR_UP
+    sta CHAR_DIRECTION + 1
+    lda #CHAR_LEFT
+    sta CHAR_DIRECTION + 2
+    lda #CHAR_DOWN
+    sta CHAR_DIRECTION + 3
+
+;===================================================================================================
+; fill maze with walls
+;===================================================================================================
+    lda #<MAZE_TOP                      ; DST points to the top of the maze
     sta DST_LSB
-    sta SC_LSB
     lda #>MAZE_TOP
     sta DST_MSB
-    sta SC_MSB
 
-; a9=6943
-    lda #<MAZE_MIDDLE                   ; set A9 to 6943 ($1B1F), about the middle of the maze
-    sta A9_LSB
-    lda #>MAZE_MIDDLE
-    sta A9_MSB
-
-;===================================================================================================
-; SYS 861 - fill maze with walls
-;===================================================================================================
-    ldx #>MAZE_END+1                    ; end point
+    ldx #>MAZE_END+1                    ; pre-calculate the end point
 
     lda #CHAR_WALL                      ; fill with wall characters
 -
-    sta (DST),y 
+    sta (DST),y
     inc DST_LSB
     bne -
     inc DST_MSB
     cpx DST_MSB
     bne -
 
-; 21 for t = sc+21 to 7679 step 22 : poke t, 32 : next : for t = sc to sc+21 : poke t, 32 : next
-    ; add all the spaces down the right hand side
-    lda #>MAZE_END_OF_TOP_LINE          ; start at SC + 21
+; add all the spaces down the right hand side
+    lda #>MAZE_END_OF_TOP_LINE          ; start at the end of the top line
     sta DST_MSB
     lda #<MAZE_END_OF_TOP_LINE
     sta DST_LSB
 
     ldx #MAZE_HEIGHT                    ; 66 times
-    
+
 -   lda #CHAR_PATH                      ; store a space
     sta (DST),y
 
-    lda DST_LSB                         ; add 22
+    lda DST_LSB                         ; move down 1 line
     clc
     adc #MAZE_WIDTH
     sta DST_LSB
     bcc +
     inc DST_MSB
 +
-    dex                                 ; check if we have hit $1E00 (7679)
+    dex                                 ; loop until complete
     bne -
 
-    ; add a row of spaces at the top  
+; add a row of spaces at the top and bottom
     lda #CHAR_PATH                      ; store a space
-    ldx #MAZE_WIDTH                     ; 22 times
+    ldx #MAZE_WIDTH                     ; over the whole maze width
 
 -   dex
     sta MAZE_TOP,x
+    sta MAZE_END+1,x
     bne -
 
-    sta MAZE_START_ME                   ; leave a space where the player starts
+; leave a space where the player starts
+    sta MAZE_PLAYER_START
 
-; make the paths
-; 22 j = int(rnd(1)*4) : x3 = j
-L22:
+;===================================================================================================
+; Build the paths
+;===================================================================================================
+
+; start in the middle
+    lda #<MAZE_MIDDLE                   ; set current sqaureto the middle of the maze
+    sta CURRENT_SQUARE_LSB
+    lda #>MAZE_MIDDLE
+    sta CURRENT_SQUARE_MSB
+
+next_move:
+
+;######################## DEBUG ##################################
+
+; DEBUG_SRC_LSB           = $F0
+; DEBUG_SRC_MSB           = $F1
+; DEBUG_SRC               = DEBUG_SRC_LSB
+
+; DEBUG_DST_LSB           = $F2
+; DEBUG_DST_MSB           = $F3
+; DEBUG_DST               = DEBUG_DST_LSB
+
+;     lda #COLOUR_BLUE                    ; all text colour to blue
+; -   sta COLOUR_RAM_PAGE0,y
+;     sta COLOUR_RAM_PAGE1,y
+;     iny
+;     bne -
+
+;     lda #<MAZE_DEBUG_OFFSET
+;     sta DEBUG_SRC_LSB
+;     lda #>MAZE_DEBUG_OFFSET
+;     sta DEBUG_SRC_MSB
+
+;     sty DEBUG_DST_LSB                   ; set the destination to the screen at 1E00
+;     lda #>SCREEN_RAM
+;     sta DEBUG_DST_MSB
+
+; -   lda (DEBUG_SRC),y                   ; copy character
+;     cmp #4
+;     bcs +
+;     ;clc                                 ; 0-3 -> "0"-"3"
+;     ;adc #$30
+;     tax                                 ; 0-3 -> direction characters
+;     lda CHAR_DIRECTION,x
+; +
+;     sta (DEBUG_DST),y
+
+;     inc DEBUG_SRC_LSB
+;     bne +
+;     inc DEBUG_SRC_MSB
+
+; +   inc DEBUG_DST_LSB
+;     bne -
+;     inc DEBUG_DST_MSB
+;     lda DEBUG_DST_MSB                   ; check for end of screen RAM
+;     cmp #$20
+;     bne -                               ; not finished yet, continue
+
+;     ldx #$08                            ; delay
+; -   dey                                 ;
+;     bne -                               ;
+;     dex                                 ;
+;     bne -                               ;
+
+;#####################################################################
+
+
+; get a random direction
     jsr RAND16                          ; get a random number
     and #$03                            ; mask off all but the lower two bits (A=0-3)
 
-    sta J
-    sta X3
+    sta DIRECTION_INDEX                 ; save the number
+    sta INITIAL_DIRECTION
 
-; 23 b = a9 + a(j)
-L23:
-    ; interesting challenge, add an 8 bit signed value to a 16 bit unsigned number
-    ldx J                               ; get the random number in X
+start_path:
+; work out the location two squares in that direction
+    lda CURRENT_SQUARE_MSB              ; copy the MSB first
+    sta CHECK_SQUARE_MSB
 
-    lda A9_MSB                          ; copy the MSB first so it can be adjusted based on what happens to the LSB
-    sta B_MSB
+    ldx DIRECTION_INDEX                 ; put the current direction into X
+    lda DOUBLE_DIRECTION,x              ; get the signed direction offset
 
-    lda ARRAY,x                         ; get the signed direction offset
-    bpl +
-    dec B_MSB                           ; if the offset is negative, decrement the MSB
+    bpl +                               ; 2 places in the direction
+    dec CHECK_SQUARE_MSB                ; if the offset is negative, decrement the MSB
 +   clc
-    adc A9_LSB                          ; now add the LSB
-    sta B_LSB
+    adc CURRENT_SQUARE_LSB              ; now add the LSB
+    sta CHECK_SQUARE_LSB
     bcc +
-    inc B_MSB                           ; increment MSB if there was a carry
+    inc CHECK_SQUARE_MSB                ; increment MSB if there was a carry
 +
 
-; 24 if peek(b) = wl then poke b, j : poke a9 + a(j)/2, hl : a9 = b : goto 22
-    lda (B),y                           ; check what is pointed at by B, Y is 0
-    cmp #CHAR_WALL                      ; is it a wall (wl)?
-    bne L25
+; is there a wall there?
+    lda (CHECK_SQUARE),y                ; check what is at the check square (Y=0)
+    cmp #CHAR_WALL                      ; is it a wall?
+    bne not_wall                        ; no, a previous path or the edge, skip
 
-    lda J                               ; store the direction number instead
-    sta (B),y
+    txa                                 ; store the direction index there
+    sta (CHECK_SQUARE),y
 
-    ; poke a9 +a(j)/2, hl  Oh boy.
+; work out the location of the square between here and where we just checked
+    lda DIRECTION,x                     ; get the signed direction offset
 
-    ; safe to mangle A9 as it is set to a different value later
-
-    lda ARRAY_HALF,x                    ; get half the signed direction offset
     bpl +
-    dec A9_MSB                          ; if the offset is negative, decrement the MSB
+    dec CURRENT_SQUARE_MSB              ; if the offset is negative, decrement the MSB
 +   clc
-    adc A9_LSB                          ; now add the LSB
-    sta A9_LSB
+    adc CURRENT_SQUARE_LSB              ; now add the LSB
+    sta CURRENT_SQUARE_LSB
     bcc +
-    inc A9_MSB                          ; increment MSB if there was a carry
+    inc CURRENT_SQUARE_MSB              ; increment MSB if there was a carry
 +
 
-    lda A9_MSB                          ; check it's not the last line
-    cmp #>MAZE_LAST_LINE
-    bne +
-    lda A9_LSB
-    cmp #<MAZE_LAST_LINE
-+   bcs +                               ; skip if on last line
+    lda #CHAR_PATH                      ; set this to a path (space)
+    sta (CURRENT_SQUARE),y
 
-    lda #CHAR_PATH                      ; set this to a space (hl)
-    sta (A9),y
+; jump over the newly created space to the one we previously looked at
+; this is basically draughts
+    lda CHECK_SQUARE_MSB
+    sta CURRENT_SQUARE_MSB
+    lda CHECK_SQUARE_LSB
+    sta CURRENT_SQUARE_LSB
 
-+   lda B_MSB                           ; a9 = b
-    sta A9_MSB
-    lda B_LSB
-    sta A9_LSB
+    jmp next_move                       ; keep moving
 
-    jmp L22
+; we hit a previous path or the edge of the screen
+not_wall:
+    ; rotate 90 degrees counter-clockwise
 
-; not a wall
-; 25 j = (j+1) * -(j<3) : if j <> x3 then 23
-L25:   
-    ;   j   (j+1)*-(j<3)    =
-    ; -------------------------
-    ;   0     1  *   1      1
-    ;   1     2  *   1      2
-    ;   2     3  *   1      3
-    ;   3     4  *   0      0
+    ; 0 = right -> up
+    ; 1 = up    -> left
+    ; 2 = left  -> down
+    ; 3 = down  -> right
 
-    inc J                               ; 0123 > 1234
-    lda J                               ; 
+    inc DIRECTION_INDEX                 ; 0123 > 1234
+    lda DIRECTION_INDEX                 ;
     and #$03                            ; 1234 > 1230
-    sta J                               ; 
-    cmp X3                              ; = X3?
-    bne L23
+    sta DIRECTION_INDEX                 ;
 
-; 26 j = peek(a9) : poke a9, hl : if j<4 then a9 = a9-a(j) : goto 22
-    lda (A9),y
-    sta J
-    tax                                 ; save J for later
-    lda #CHAR_PATH 
-    sta (A9),y
+    cmp INITIAL_DIRECTION               ; are we back to the direction we started?
+    bne start_path                      ; no, have another go
 
-    cpx #4                              ; J<4?
-    bcs L27
+; check the current square
+    lda (CURRENT_SQUARE),y              ; x is what is at the current square
+    tax
 
-    ; here we go again, subtract an 8 bit signed value from a 16 bit unsigned number
+    lda #CHAR_PATH                      ; now make it a path
+    sta (CURRENT_SQUARE),y
 
-    lda ARRAY,x                         ; get signed direction offset
+    cpx #4                              ; was it a previous direction index number?
+    bcs next_round                      ; no, we must be back at the start, the maze is complete
+
+; we can't go any further from this point, in any direction, retrace our steps
+    lda DOUBLE_DIRECTION,x              ; get signed direction offset
     sta TEMP                            ; save for later
     bpl +
-    inc A9_MSB                          ; if the offset is negative, increment the MSB
+    inc CURRENT_SQUARE_MSB              ; if the offset is negative, increment the MSB
 +   sec
-    lda A9_LSB                          ; now subtract the offset from the LSB
+    lda CURRENT_SQUARE_LSB              ; now subtract the offset from the LSB
     sbc TEMP
-    sta A9_LSB
+    sta CURRENT_SQUARE_LSB
     bcs +
-    dec A9_MSB                          ; decrement MSB if there was a carry
+    dec CURRENT_SQUARE_MSB              ; decrement MSB if there was a carry
 +
-    jmp L22
+    jmp next_move
+
+;===================================================================================================
+; Start a new round
+;===================================================================================================
+next_round:
+    sty OLD_PLAYER_LSB                  ; clear the old me position
+    sty OLD_PLAYER_MSB
 
 ; Set the location of the timebomb
-; 27 tb = sc + int(rnd(0)*20) + 220 : if (peek(tb) <> 32) goto 27 else poke tb, 42
-L27:
-    sty OM_LSB                          ; clear the old me position 
-    sty OM_MSB
+; the bomb is always on the 10th row from the top, but any position horizontally
+select_bomb_location:
+    lda #>MAZE_START_OF_BOMB_LINE       ; start with the MSB.
+    sta TIMEBOMB_MSB
 
-    lda SC_MSB                          ; start with the MSB.
-    sta TB_MSB
+; Get a random number from 0-19
+; LSB masked gives number from 0-3
+; MSB shifted into carry gives number 0-1
+; MSB remainder masked gives number from 0-15
+; total 0-19
 
-    ;   OK, so I want a random number from 0-19.
-
+get_rand
     jsr RAND16                          ; A now contains an 8 bit random number
     and #$03                            ; now have number from 0-3
     sta TEMP                            ; save for later
     lda SEED_LSB                        ; get another 8 bits of random number
+    ror                                 ; shift 1 bit of that number into carry, 0-1
     and #$0F                            ; now have a number from 0-15
-    clc
-    adc TEMP                            ; now add the number from 0-3 and we have a number from 0-19 Yay!
+    adc TEMP                            ; now add the number from 0-3, and the 0-1 carry
 
-    adc #$DC                            ; add 220 (will not be > 255, so no need to check carry)
-    adc SC_LSB                          ; now add the LSB
-    sta TB_LSB
+    adc #<MAZE_START_OF_BOMB_LINE       ; add to the location
+    sta TIMEBOMB_LSB
     bcc +                               ; incrememnt MSB if necessary
-    inc TB_MSB
+    inc TIMEBOMB_MSB
 +
-    lda (TB),y                          ; lets see what's at this timebomb location
+
+; check timebomb location
+    lda (TIMEBOMB),y                    ; lets see what's at this timebomb location
     cmp #CHAR_PATH                      ; is it a space?
-    bne L27                             ; no, then try again
+    bne select_bomb_location            ; no, then try again
 
     lda #CHAR_BOMB                      ; plant the timebomb
-    sta (TB),y
+    sta (TIMEBOMB),y
 
-
-; 28 sys 830 : poke 828, 204 : poke 829, 28 : sys 923 : goto 4
 ;===================================================================================================
-; SYS 830 - setup VIC and fill the colour memory
+; Setup VIC and fill the colour memory
 ;===================================================================================================
     lda #$EE                            ; set the screen and border colours purple / light blue
     sta VIC_BORDER
@@ -305,25 +355,24 @@ L27:
     iny
     bne -
 
-    lda #<MAZE_START_OFFSET             ; maze offset to $1CCC (middle left hand edge)
+    lda #<MAZE_START_OFFSET             ; set the maze offset so player is in middle of screen
     sta OFFSET_LSB
     lda #>MAZE_START_OFFSET
     sta OFFSET_MSB
 
-    jsr sys923                          ; redraw maze
+    jsr draw_screen                     ; draw the starting view of the maze
 
 ;===================================================================================================
 ; Intro Sound
 ;===================================================================================================
-; 4 for t = 240 to 208 step -4 : poke s, t : for tt = 0 to 30 : poke v, tt/2 : next : next t : poke s, 0 : me = 7932
-L4:
+intro:
     lda #$F0                            ; Start at 240
 
-L4_2:
-    sta VIC_OSC1_FREQ, y                ; Tick, tick
+intro1:
+    sta VIC_OSC1_FREQ, y                ; make the sound
     ldx #0
 
-L4_3:
+intro2:
     stx VIC_VOLUME
 
     ldx #$0C                            ; short delay
@@ -335,105 +384,110 @@ L4_3:
     ldx VIC_VOLUME                      ; get X back
     inx
     cpx #$0F
-    bne L4_3
-    stx VIC_VOLUME                      ; the last of the 30 cycles will write 15 once
+    bne intro2
 
-    sec
+    stx VIC_VOLUME                      ; set the volume to max
+
+    sec                                 ; drop the frequency
     sbc #04
     cmp #$D0                            ; reached 208?
-    bcs L4_2
+    bcs intro1                          ; no
 
     sty VIC_OSC1_FREQ                   ; stop the oscillator
 
-    lda #<SCREEN_START_ME               ; set ME to $1EFC (7932) (middle of screen, starting point)
-    sta ME_LSB
+; Position player
+    lda #<SCREEN_START_ME               ; position player in the middle of screen
+    sta PLAYER_LSB
     lda #>SCREEN_START_ME
-    sta ME_MSB
-
-    lda JIFFY_LSB                       ; setup the timer
-    sta LAST_JIFFY
+    sta PLAYER_MSB
 
 ;===================================================================================================
 ; Main Loop
 ;===================================================================================================
-; 5 poke om, 32 : poke om+df, 10 : poke me, m1 : poke me+df, 7 : if f then 40
-L5:    
-    lda LAST_JIFFY                      ; wait for every 8th frame
-    clc
-    adc #$08
-    sta LAST_JIFFY                      ; store value for next time
--   cmp JIFFY_LSB
-    bne -    
+main_loop:
+    lda JIFFY_LSB                       ; wait until not an 8th frame
+    and #$07
+    beq main_loop
 
-    lda #CHAR_PATH                      ; First time around OM is 0, so writes to $0000
-    sta (OM),y
-    
-    lda OM_MSB                          ; DST = OM+DF (offset from screen to colour RAM)
+-   lda JIFFY_LSB                       ; wait until an 8th frame
+    and #$07
+    bne -
+
+; clear previous player position
+    lda #CHAR_PATH                      ; first time around OLD_PLAYER is at $0000
+    sta (OLD_PLAYER),y
+
+; clear the colour of that square
+    lda OLD_PLAYER_MSB                  ; add the offset from screen to colour RAM
     clc
     adc #COLOUR_RAM_OFFSET_MSB
     sta DST_MSB
 
-    lda OM_LSB                          ; DF is 32720 = $7800, so no need to alter LSB
+    lda OLD_PLAYER_LSB                  ; LSB remains the same
     sta DST_LSB
 
     lda #COLOUR_LIGHTRED                ; set to background colour
-    sta (DST),y                         
+    sta (DST),y
 
-    lda M1                              ; poke me,m1, set the direction character
-    sta (ME),y
+; set new player position
+    lda PLAYER_CHARACTER                ; set the direction character
+    sta (PLAYER),y
 
-    lda ME_MSB                          ; DST = ME+DF
+; set the colour of that square
+    lda PLAYER_MSB                      ; add the offset from screen to colour RAM
     clc
     adc #COLOUR_RAM_OFFSET_MSB
     sta DST_MSB
 
-    lda ME_LSB                          ; DF is 32720 = $7800, so no need to alter LSB
+    lda PLAYER_LSB                      ; LSB remains the same
     sta DST_LSB
 
-    lda #COLOUR_YELLOW                  ; set me colour yellow
+    lda #COLOUR_YELLOW                  ; set player colour yellow
     sta (DST),y
 
-    lda F                               ; check F, has player found the bomb?
-    beq L6
-    jmp L40                             ; if so, goto 40
+; has the bomb been found?
+    lda FOUND                           ; check F, has player found the bomb?
+    beq +
+    jmp bomb_found                      ; if so, round is complete
 
-; 6 k = k+1 : if (k/2 <> int(k/2)) goto 8 else if k>600 then 37
-L6:
-    inc K_UNITS                         ; K is stored as tens and units to simplify things
-    
-    lda K_UNITS
+; incrememnt the timer
++   inc TIMER_UNITS                     ; timer is stored as tens and units to simplify things
+
+    lda TIMER_UNITS
     cmp #10
     bcc +
-    inc K_TENS                          ; K hit 10
-    sty K_UNITS                         ; K_UNITS gets reset (Y=0)
-+                     
-    ror                                 ; check bit 0, if clear it is odd, so go to 8
-    bcc L8
+    inc TIMER_TENS                      ; timer hit 10, increment tens
+    sty TIMER_UNITS                     ; reset units (Y=0)
++
 
-    lda K_TENS                          ; check if K > 600 
+; only tick on alternate cycles
+    ror                                 ; check bit 0, if clear it is odd, so skip ticking
+    bcc check_joystick
+
+; odd cycle, how are we doing?
+    lda TIMER_TENS                      ; only need to check the tens
     cmp #60
-    bcc L7 
-    jmp L37
+    bcc tick                            ; we're ok, kiip ticking
+    jmp timed_out                       ; timed out, round over
 
 ;======================================================================================
 ; Ominous ticking
 ;======================================================================================
-; 7 for t = 1 to 2 : poke v, t*4 : poke s+1, 128+k/5 : next : poke s+1, 0
-L7: 
-    lda #4                              ; pass 1, t*4 = 4
-    sta TEMP   
+tick:
+    lda #4                              ; pass 1, set volume to 4
 
-L7_1:
+tock:
     sta VIC_VOLUME                      ; v
 
-    ; pokes+1,128+k/5  - really, come on, give me a break here
-    ; max K is 600, so max k/5 is 120. So range is 128-248
-    
-    lda K_TENS                          ; this is K/10
-    asl                                 ; k/10 -> K/5
+    ; set vic oscillator based on remaining time
+    ; max TIMER_TENS is 60, doubled max is 120.
+    ; Range is 128-248
+
+    lda TIMER_TENS                      ; get the tens
+    asl                                 ; double it
     ora #$80                            ; add 128
 
-    sta VIC_OSC2_FREQ                   ; s+1
+    sta VIC_OSC2_FREQ                   ; set the frequency
 
     ldx #$08
 -   dey                                 ; short delay
@@ -441,163 +495,160 @@ L7_1:
     dex                                 ;
     bne -                               ;
 
-    lda #8                              ; was TEMP 8 ?
-    cmp TEMP
-    beq L7_2                            ; finished
+    lda #8                              ; was VIC_VOLUME 8 already ?
+    cmp VIC_VOLUME
+    bne tock                            ; no, loop again, this time at volume 8
 
-    sta TEMP                            ; no, set it to 8 now
-    bne L7_1                            ; branch always
-
-L7_2:
-    sty VIC_OSC2_FREQ                   ; s+1 = 0
+    sty VIC_OSC2_FREQ                   ; disable the oscillator (Y=0)
 
 ;======================================================================================
 ; Check joystick and move
 ;======================================================================================
-; 8 poke d, 127 : p = peek(p2) and 128 : j0 = -(p = 0)
-; 9 poke d, 255 : p = peek(p1) : j1 = -((p and 8) = 0) : j2 = -((p and 16) = 0) : j3 = -((p and 4) = 0)
-; 10 if j0 then c = 1 : m1 = 62 : goto 14
-; 11 if j1 then c = 22 : m1 = 22 : goto 14
-; 12 if j2 then c = -1 : m1 = 60 : goto 14
-; 13 if j3 then c = -22 : m1 = 30
-L8:
-    lda #$7F                            ; set joystick 3 as input
+check_joystick:
+    lda VIA1_PORTA                      ; read port A where three of the joystick pins are
+    tax                                 ; save value
+
+    and #8
+    bne +                               ; skip if not zero (active)
+    ldx #DOWN                           ; set new direction
+    bne move_player                     ; jump always
++
+    txa                                 ; get back the port reading
+    and #16
+    bne +                               ; skip if not zero (active)
+    ldx #LEFT                           ; set new direction
+    bne move_player
++
+    txa                                 ; get back the port reading
+    and #4
+    bne +                               ; skip if not zero (active)
+    ldx #UP                             ; set new direction
+    bne move_player
+
++
+    lda #$7F                            ; set joystick3 as input
     sta VIA2_DDRB
 
     lda VIA2_PORTB                      ; read the port
 
     ldx #$FF
     stx VIA2_DDRB                       ; back to all inputs for keyboard scanning
-    
+
     and #$80                            ; mask of the pin
-    bne +                               ; skip if not zero (active)
-    ldx #MOVE_RIGHT                     ; set new direction (was using C)
-    lda #CHAR_RIGHT                     ; set new character (will get written to M1)
-    bne L14
-+
+    bne back_to_main_loop               ; nothing moving, back to main loop
+    ldx #RIGHT                          ; set new direction
 
-    lda VIA1_PORTA                      ; read port A and set J1,2 and 3 accordingly
-    tax                                 ; save value
+; try to move the player
+move_player:
+    lda PLAYER_LSB                      ; save the old location
+    sta OLD_PLAYER_LSB
+    lda PLAYER_MSB
+    sta OLD_PLAYER_MSB
 
-    and #8
-    bne +                               ; skip if not zero (active)
-    ldx #MOVE_DOWN                      ; set new direction (was using C)
-    lda #CHAR_DOWN                      ; set new character (will get written to M1)
-    bne L14
-+
-    txa                                 ; get back the port reading
-    and #16
-    bne +                               ; skip if not zero (active)
-    ldx #MOVE_LEFT                      ; set new direction (was using C)
-    lda #CHAR_LEFT                      ; set new character (will get written to M1)
-    bne L14
-+
-    txa                                 ; get back the port reading
-    and #4
-    bne L16_2                           ; back to start if no movement detected
-    ldx #MOVE_UP                        ; set new direction (was using C)
-    lda #CHAR_UP                        ; set new character (will get written to M1)
+    lda CHAR_DIRECTION,x                ; get new player direction character
+    sta PLAYER_CHARACTER
 
-; 14 om = me : me = me+c : c = 0
-L14:
-    sta M1                              ; store new player direction
-
-    lda ME_LSB                          ; old me = current me
-    sta OM_LSB
-    lda ME_MSB
-    sta OM_MSB
-
-    txa                                 ; me=me+c - move me
+    lda DIRECTION,x                     ; get new player direction
     bpl +
-    dec ME_MSB                          ; if c is negative, decrement the MSB
+    dec PLAYER_MSB                      ; if direction is negative, decrement the MSB
 +   clc
-    adc ME_LSB
-    sta ME_LSB
+    adc PLAYER_LSB
+    sta PLAYER_LSB
     bcc +
-    inc ME_MSB
-+   
+    inc PLAYER_MSB
++
 
-; 15 if peek(me) <> 32 and peek(me) <> 42 then me = om
-    lda (ME),y
+; check new location
+    lda (PLAYER),y
 
     cmp #CHAR_PATH                      ; is it a clear path?
-    beq L16                             ; yes, skip
+    beq ok_to_move                      ; yes, that's ok
 
     cmp #CHAR_BOMB                      ; is it a bomb?
-    beq L16                             ; yes, skip
+    bne must_be_a_wall                  ; no
+    inc FOUND                           ; yes, set found
+    bne back_to_main_loop               ; back to the main loop to tidy up first
 
-    ldx OM_LSB                          ; me = old me - you can't want into walls
-    stx ME_LSB
-    ldx OM_MSB
-    stx ME_MSB
+must_be_a_wall:
+    lda OLD_PLAYER_LSB                  ; me = old me - you can't want into walls
+    sta PLAYER_LSB
+    lda OLD_PLAYER_MSB
+    sta PLAYER_MSB
 
-; 16 if peek(me) = 42 then f = 1 : goto 5
-L16:
-    cmp #CHAR_BOMB                      ; is it a bomb?
-    bne L17                             ; no, skip
+back_to_main_loop:
+    jmp main_loop
 
-    inc F                               ; it is a bomb, set found
-L16_2:    
-    jmp L5
+; it is OK to move
+ok_to_move:
 
-    
-; 17 if (me>7921) goto 18 else sys 887 : me = me+22 : goto 5
-L17:
-    lda ME_MSB                           ; if me>1EF1 goto 18
+; check if we need to scroll down now
+    lda PLAYER_MSB                      ; is the player on the line above centre?
     cmp #>SCREEN_LINE_ABOVE_ME
     bne +
-    lda ME_LSB
+    lda PLAYER_LSB
     cmp #<SCREEN_LINE_ABOVE_ME
 +
-    bcs L18
+    bcs check_scroll_up
 
-    jsr sys887                          ; scroll down
+; yes, move the offset up and the player down
+    lda #MOVE_UP                        ; offset = offset - 1 row
+    dec OFFSET_MSB                      ; pre-decrement MSB for subtraction
+    ldx #MOVE_DOWN                      ; player = player + 1 row
+    bne scroll                          ; jump always
 
-    lda ME_LSB                          ; me += 22 
-    clc
-    adc #MOVE_DOWN
-    sta ME_LSB
-    bcc +
-    inc ME_MSB
-+
-    jmp L5
-
-; 18 if (me<7944) goto 5 else sys 905 : me = me-22 : goto 5
-L18
-    lda ME_MSB                          ; is ME < 1F08
+check_scroll_up:
+    lda PLAYER_MSB                      ; is the player on the line below centre?
     cmp #>SCREEN_LINE_BELOW_ME
     bne +
-    lda ME_LSB
+    lda PLAYER_LSB
     cmp #<SCREEN_LINE_BELOW_ME
 +
-    bcc +
+    bcc back_to_main_loop               ; no
 
-    jsr sys905                          ; scroll up
+; yes, move the offset down and the player up
+    lda #MOVE_DOWN                      ; offset = offset + 1 row
+    ldx #MOVE_UP                        ; player = player - 1 row
+    dec PLAYER_MSB                      ; pre-decrement MSB for subtraction
 
-    lda ME_LSB                          ; me += -22
-    dec ME_MSB
-    clc
-    adc #MOVE_UP
-    sta ME_LSB
+; adjust offset view
+scroll:
+    clc                                 ; a contains + or - 1 row
+    adc OFFSET_LSB
+    sta OFFSET_LSB
     bcc +
-    inc ME_MSB
+    inc OFFSET_MSB
 +
-    jmp L5
+
+; move player back to the centre line
+    txa                                 ; x contains + or - 1 row
+    clc
+    adc PLAYER_LSB
+    sta PLAYER_LSB
+    bcc +
+    inc PLAYER_MSB
++
+
+; redraw the screen
+    jsr draw_screen
+
+; back to the start
+    jmp main_loop
+
 
 ;===================================================================================================
 ; Timeout, bomb explodes
 ;===================================================================================================
-; 37 poke v, 15 : for t = 255 to 127 step -2 : poke s, t : poke v-9, 255 : for g = 1 to 10 : next
-L37:
-    lda #15                             ; full volume
+timed_out:
+    lda #$0F                            ; set full volume
     sta VIC_VOLUME
 
-    ldx #$FF
-L37_1:
-    stx VIC_OSC1_FREQ                   ; s = t
+    ldx #$FF                            ; start at 255
+fizz:
+    stx VIC_OSC1_FREQ                   ; set the frequency
 
+; change the addressing to mess up the screen
     lda #$FF
-    sta VIC_ADDRESSING                  ; v-9 = 255
+    sta VIC_ADDRESSING
 
     ldx #$09                            ; short delay
 -   dey                                 ;
@@ -605,7 +656,7 @@ L37_1:
     dex                                 ;
     bne -                               ;
 
-; 38 poke v-9, 242 : for g = 1 to 10 : next : poke v-9, 240 : next : poke v-1, 220 : for g = 15 to 0 step -.05
+; change the addressing to mess up the screen
     lda #$F2
     sta VIC_ADDRESSING                  ; v-9 = 242
 
@@ -615,67 +666,58 @@ L37_1:
     dex                                 ;
     bne -                               ;
 
-    ldx VIC_OSC1_FREQ                   ; get X back
-
     lda #$F0
     sta VIC_ADDRESSING                  ; v-9 = 240
 
-    dex                                 ; t=t-2
+    ldx VIC_OSC1_FREQ                   ; what's the frequency Kenneth?
+    dex                                 ; reduce it
     dex
-    bmi L37_1                           ; loop when t > 127
+    bmi fizz                            ; loop when until < 128
 
     ; now the explosion
 
-    lda #$DC
-    sta VIC_NOISE_FREQ                  ; v-1 = 220
+    lda #$DC                            ; set the noise frequency
+    sta VIC_NOISE_FREQ
 
-; for g = 15 to 0 step -.05   oh no, what?
-
-; 39 poke v, g : poke v+1, g*10 : next : poke v-1, 0 : poke v+1, 238 : gosub 42 : run
-L39:
-    lda #$96                            ; v+1 = g*10
-    sta VIC_BORDER            
-
-    lda #$0F                            ; v = g
-    sta VIC_VOLUME
+    lda #$96                            ; change the colours
+    sta VIC_BORDER
 
     ldx #$0A                            ; loop 10 times
 
--   dey                                 ; delay
-    bne -
+flash:
+    dey                                 ; delay
+    bne flash
 
-    dec VIC_BORDER                      ; v+1 = g*10
+    dec VIC_BORDER                      ; flash the border colour
     dex
-    bne -
+    bne flash
 
-    dec VIC_VOLUME                      ; v = g
-    bne -
+    dec VIC_VOLUME                      ; reduce the colume
+    bne flash
 
-    sty VIC_NOISE_FREQ                  ; v-1 = 0 
+; silence
+    sty VIC_NOISE_FREQ                  ; stop the noice
 
-    lda #$EE                            ; v+1 = 238
-    sta VIC_BORDER            
+    lda #$EE                            ; back to normal
+    sta VIC_BORDER
 
-    jsr L42                             ; display "ROUND R, PRESS F7"
+    jsr end_of_round                    ; display "ROUND R, PRESS F7"
 
-    jmp L1                              ; restart
+    jmp start                           ; restart with a new maze (since you blew the old one up)
 
 ;===================================================================================================
 ; Success
 ;===================================================================================================
-
-; 40 poke tb, 32 : poke v-1, 253 : for g = 30 to 0 step -.15 : poke v, g/2 : next : x = x+50 : if x>449 then x = 450
-L40:
-    lda #CHAR_PATH                     ; dispose of the timebomb
-    sta (TB),y
+bomb_found:
+    lda #CHAR_PATH                      ; dispose of the timebomb
+    sta (TIMEBOMB),y
 
     lda #$FD
-    sta VIC_NOISE_FREQ                  ; v-1 = 253
+    sta VIC_NOISE_FREQ                  ; defusing noise
 
-    ; for g = 30 to 0 step -.15  oh come on, give me a break
     ldx #$0F                            ; g = 30, x = g/2 = 15
 
-L40_1:    
+defuse:
     stx VIC_VOLUME                      ; v = g/2 = x
 
     ldx #$35                            ; delay
@@ -687,145 +729,126 @@ L40_1:
     ldx VIC_VOLUME                      ; get X back
 
     dex
-    bne L40_1
+    bne defuse
 
+; reduce the available time for the next round
     clc
-    lda X_TENS                          ; x = x+50
+    lda PENALTY                         ; add 5 seconds penalty
     adc #$05
-    sta X_TENS
+    sta PENALTY
 
-    cmp #$2D                            ; x > 450 ?
-    bcc L41
-
-    lda #$2D                            ; x = 450
-    sta X_TENS                          ; X_UNITS is always 0
-
-; 41 poke v-1, 0 : f = 0 : k = x : r = r+1 : gosub 42 : goto 27
-L41:
-    sty VIC_NOISE_FREQ                  ; v-1 = 0
-
-    sty F                               ; f = 0
-
-    lda X_TENS                          ; k = x, start K counter at X
-    sta K_TENS
-    sty K_UNITS                         ; X_UNITS is always 0
-    
-    inc R_UNITS                         ; r = r+1
-    lda R_UNITS
-    cmp #10
+    cmp #$2D                            ; have we gone too far?
     bcc +
-    sty R_UNITS                         ; if R_UNITS>9 then R_UNITS=0 R_TENS++
-    inc R_TENS
-+  
-    jsr L42                             ; display "ROUND R, PRESS F7"
+    lda #$2D                            ; limit the maximum penalty
+    sta PENALTY
++
 
-    jmp L27                             ; next round
+    sty VIC_NOISE_FREQ                  ; stop the noise
+    sty FOUND                           ; the bomb has not been found
+
+    lda PENALTY                         ; start the timer, with the penalty
+    sta TIMER_TENS
+    sty TIMER_UNITS
+
+; increment the round number
+    inc ROUND_UNITS
+    lda ROUND_UNITS
+    cmp #10                             ; has it reached 10?
+    bcc +
+    sty ROUND_UNITS                     ; clear and increment the 10s count
+    inc ROUND_TENS
++
+    jsr end_of_round                    ; display "ROUND R, PRESS F7"
+
+    jmp next_round                      ; next round
 
 ;===================================================================================================
-; Print ROUND R - PRESS F7
+; end of round, print ROUND R - PRESS F7
 ;===================================================================================================
-; 42 print "{home}round" r "{right} " : print "{down}press f7 " : a$ = "" : get a$ : if (a$ <> "{f7}") goto 42 else return
-L42:
-    ldx #TEXT_LEN-1                     ; was 2x WriteColourString Macro               
--   lda TEXT_ROUND_x,x
+end_of_round:
+    ldx #TEXT_LEN-1                     ; write out two 8 character strings
+
+-   lda TEXT_ROUND_x,x                  ; "ROUND   "
     sta SCREEN_RAM_LINE_00,x
-    lda TEXT_PRESS_F7,x
-    sta SCREEN_RAM_LINE_02,x    
-    lda #COLOUR_BLUE
+    lda TEXT_PRESS_F7,x                 ; "PRESS F7"
+    sta SCREEN_RAM_LINE_02,x
+
+    lda #COLOUR_BLUE                    ; both blue
     sta COLOUR_RAM_LINE_00,x
     sta COLOUR_RAM_LINE_02,x
-    dex 
+
+    dex
     bpl -
 
-    lda R_TENS
-    beq L42_1
+; display the round number
+    lda ROUND_TENS                      ; any tens?
+    beq single
 
     ; double digit
-    clc    
-    adc #$30                            ; A = R+30  (0->"0")
-    sta SCREEN_RAM + 6                 
+    clc                                 ; make printable (0->"0")
+    adc #$30
+    sta SCREEN_RAM + 6
 
-    lda R_UNITS
-    clc
-    adc #$30                            ; A = R+30  (0->"0")
-    sta SCREEN_RAM + 7                  
-    bne L42_2                           ; branch always
+    lda ROUND_UNITS
+    clc                                 ; make printable (0->"0")
+    adc #$30
+    sta SCREEN_RAM + 7
+    bne check_key                       ; branch always
 
-L42_1:
+single:
     ; single digit
-    lda R_UNITS
-    clc
-    adc #$30                            ; A = R+30  (0->"0")
-    sta SCREEN_RAM + 6                  
+    lda ROUND_UNITS
+    clc                                 ; make printable (0->"0")
+    adc #$30
+    sta SCREEN_RAM + 6
 
-L42_2:        
+check_key:
     lda LAST_KEY                        ; check last key pressed
     cmp #KEY_F7                         ; was it F7?
-    bne L42_2                           ; no, keep checking
-    
+    bne check_key                       ; no, keep checking
+
     rts                                 ; yes, return
 
 ;===================================================================================================
-; SYS 887 Scroll screen up
+; redraw the screen
 ;===================================================================================================
-sys887:
-    dec OFFSET_MSB                      ; pre-decrement as this is a subtraction
-    lda #MOVE_UP                        ; offset = offset - 22
-    bne +
-
-;===================================================================================================
-; SYS 905 Scroll screen down
-;===================================================================================================
-sys905:
-    lda #MOVE_DOWN                      ; offset = offset + 22
-+
-    clc
-    adc OFFSET_LSB
-    sta OFFSET_LSB
-    bcc +
-    inc OFFSET_MSB
-+
-
-;===================================================================================================
-; SYS 923 redraw screen
-;===================================================================================================
-sys923:
-    lda OFFSET_LSB                      ; set the source (the map bitmap)
+draw_screen:
+    lda OFFSET_LSB                      ; set the source (offset into the map bitmap)
     sta SRC_LSB
     lda OFFSET_MSB
     sta SRC_MSB
 
-    sty DST_LSB                         ; set the destination to the screen at 1E00    
+    sty DST_LSB                         ; set the destination to the screen RAM
     lda #>SCREEN_RAM
     sta DST_MSB
 
 -   lda (SRC),y                         ; copy character
     sta (DST),y
 
-    inc SRC_LSB
+    inc SRC_LSB                         ; move the source pointer
     bne +
     inc SRC_MSB
-    lda SRC_MSB
-    cmp #$1E                            ; check for end of map
+    lda SRC_MSB                         ; at the end?
+    cmp #>MAZE_END+1
     bne +
-    lda #<MAZE_START_OFFSET             ; reset source to top starting offset
+
+    lda #<MAZE_START_OFFSET             ; end of maze, duplicate the end section again
     sta SRC_LSB
     lda #>MAZE_START_OFFSET
     sta SRC_MSB
 
-+   inc DST_LSB
++   inc DST_LSB                         ; move the destination pointer
     bne -
     inc DST_MSB
     lda DST_MSB                         ; check for end of screen RAM
-    cmp #$20                
-    bne -                               ; no finished yet, continue
+    cmp #>END_OF_SCREEN_RAM+1
+    bne -                               ; not finished yet, continue
 
     rts
 
 ;======================================================================================
-; Pseudo-random-number generator. You can get 8-bit
-; random numbers in A or 16-bit numbers from the zero
-; page addresses. Leaves X/Y unchanged.
+; Pseudo-random-number generator. You can get 8-bit random numbers in A
+; or 16-bit numbers from the zero page addresses. Leaves X/Y unchanged.
 ;
 ; (36 clock cycles)
 ;
@@ -852,7 +875,6 @@ RAND16:
 ;======================================================================================
 ; Strings
 ;======================================================================================
-
 TEXT_ROUND_x:
     !scr    "round   "
 
@@ -860,4 +882,5 @@ TEXT_PRESS_F7:
     !scr    "press f7"
 
 TEXT_LEN  = 8
+
 

@@ -4,7 +4,7 @@
      2                          ; Timebomb
      3                          ; Based on BASIC type in program in Compute! July 1983 by Doug Smoak
      4                          ; Dave Curran 2024-06-12
-     5                          ; Revised 2026-01-13, 2026-07-19, 2026-07-31
+     5                          ; Revised 2026-01-13, 2026-07-19, 2026-07-31, 2026-08-03
      6                          ;===================================================================================================
      7                          
      8                          ; ACME.exe timebomb.asm
@@ -21,7 +21,7 @@
      4                          
      5                          ;======================================================================================
      6                          ; Hardware addresses
-     7                          ;======================================================================================          
+     7                          ;======================================================================================
      8                          VIC                 = $9000
      9                          VIC_ADDRESSING      = $9005 ; v-9
     10                          VIC_OSC1_FREQ       = $900A ; s
@@ -42,178 +42,184 @@
     25                          LAST_KEY            = $C5
     26                          
     27                          ;======================================================================================
-    28                          ; Variables
+    28                          ; Zero page Variables
     29                          ;======================================================================================
-    30                          VARS                = $00
+    30                          ; $00 and $01 get overwritten
     31                          
-    32                          TEMP                = VARS + $00
+    32                          TEMP                    = $02
     33                          
-    34                          SRC_LSB             = VARS + $08
-    35                          SRC_MSB             = VARS + $09
-    36                          SRC                 = SRC_LSB
+    34                          SRC_LSB                 = $03
+    35                          SRC_MSB                 = $04
+    36                          SRC                     = SRC_LSB
     37                          
-    38                          DST_LSB             = VARS + $0A
-    39                          DST_MSB             = VARS + $0B
-    40                          DST                 = DST_LSB
+    38                          DST_LSB                 = $05
+    39                          DST_MSB                 = $06
+    40                          DST                     = DST_LSB
     41                          
-    42                          SEED_LSB            = VARS + $10
-    43                          SEED_MSB            = VARS + $11
-    44                          SEED                = SEED_LSB
+    42                          SEED_LSB                = $07
+    43                          SEED_MSB                = $08
+    44                          SEED                    = SEED_LSB
     45                          
     46                          ;--------------------------------------------------------------------------------------
     47                          ; Arrays
     48                          ;--------------------------------------------------------------------------------------
-    49                          ARRAY               = VARS + $20
-    50                          ARRAY_HALF          = VARS + $24
-    51                          
-    52                          ;--------------------------------------------------------------------------------------
-    53                          ; 16 bit Variables
-    54                          ;--------------------------------------------------------------------------------------
-    55                          SC_LSB              = VARS + $30
-    56                          SC_MSB              = VARS + $31
-    57                          SC                  = SC_LSB
-    58                          
-    59                          A9_LSB              = VARS + $32
-    60                          A9_MSB              = VARS + $33
-    61                          A9                  = A9_LSB
-    62                          
-    63                          B_LSB               = VARS + $34
-    64                          B_MSB               = VARS + $35
-    65                          B                   = B_LSB
-    66                          
-    67                          TB_LSB              = VARS + $36
-    68                          TB_MSB              = VARS + $37
-    69                          TB                  = TB_LSB
-    70                          
-    71                          ME_LSB              = VARS + $38
-    72                          ME_MSB              = VARS + $39
-    73                          ME                  = ME_LSB
-    74                          
-    75                          OM_LSB              = VARS + $3A
-    76                          OM_MSB              = VARS + $3B
-    77                          OM                  = OM_LSB
-    78                          
-    79                          K_UNITS             = VARS + $3C
-    80                          K_TENS              = VARS + $3D
-    81                          
-    82                          ; X_UNITS             = VARS + $3E
-    83                          X_TENS              = VARS + $3F
-    84                          
-    85                          R_UNITS             = VARS + $40
-    86                          R_TENS              = VARS + $41
-    87                          
-    88                          OFFSET_LSB          = VARS + $42
-    89                          OFFSET_MSB          = VARS + $43
-    90                          OFFSET              = OFFSET_LSB
-    91                          
-    92                          ;--------------------------------------------------------------------------------------
-    93                          ; 8 bit Variables
-    94                          ;--------------------------------------------------------------------------------------
-    95                          X3                  = VARS + $50
-    96                          J                   = VARS + $51
-    97                          F                   = VARS + $52
-    98                          M1                  = VARS + $53
-    99                          LAST_JIFFY          = VARS + $54
-   100                          
-   101                          ;======================================================================================
-   102                          ; Screen layout
-   103                          ;======================================================================================          
-   104                          SCREEN_RAM              = $1E00
-   105                          SCREEN_RAM_PAGE0        = SCREEN_RAM + $0000
-   106                          SCREEN_RAM_PAGE1        = SCREEN_RAM + $0100
+    49                          DIRECTION               = $10
+    50                          DOUBLE_DIRECTION        = $14
+    51                          CHAR_DIRECTION          = $18
+    52                          
+    53                          ;--------------------------------------------------------------------------------------
+    54                          ; 16 bit Variables
+    55                          ;--------------------------------------------------------------------------------------
+    56                          CURRENT_SQUARE_LSB      = $20
+    57                          CURRENT_SQUARE_MSB      = $21
+    58                          CURRENT_SQUARE          = CURRENT_SQUARE_LSB
+    59                          
+    60                          CHECK_SQUARE_LSB        = $22
+    61                          CHECK_SQUARE_MSB        = $23
+    62                          CHECK_SQUARE            = CHECK_SQUARE_LSB
+    63                          
+    64                          TIMEBOMB_LSB            = $24
+    65                          TIMEBOMB_MSB            = $25
+    66                          TIMEBOMB                = TIMEBOMB_LSB
+    67                          
+    68                          PLAYER_LSB              = $26
+    69                          PLAYER_MSB              = $27
+    70                          PLAYER                  = PLAYER_LSB
+    71                          
+    72                          OLD_PLAYER_LSB          = $28
+    73                          OLD_PLAYER_MSB          = $29
+    74                          OLD_PLAYER              = OLD_PLAYER_LSB
+    75                          
+    76                          OFFSET_LSB              = $2A
+    77                          OFFSET_MSB              = $2B
+    78                          OFFSET                  = OFFSET_LSB
+    79                          
+    80                          ROUND_UNITS             = $2C
+    81                          ROUND_TENS              = $2D
+    82                          
+    83                          TIMER_UNITS             = $2E
+    84                          TIMER_TENS              = $2F
+    85                          
+    86                          ;--------------------------------------------------------------------------------------
+    87                          ; 8 bit Variables
+    88                          ;--------------------------------------------------------------------------------------
+    89                          INITIAL_DIRECTION       = $30
+    90                          DIRECTION_INDEX         = $31
+    91                          FOUND                   = $32
+    92                          PLAYER_CHARACTER        = $33
+    93                          LAST_JIFFY              = $34
+    94                          PENALTY                 = $35
+    95                          
+    96                          ;======================================================================================
+    97                          ; Screen layout
+    98                          ;======================================================================================
+    99                          SCREEN_RAM              = $1E00
+   100                          SCREEN_RAM_PAGE0        = SCREEN_RAM + $0000
+   101                          SCREEN_RAM_PAGE1        = SCREEN_RAM + $0100
+   102                          END_OF_SCREEN_RAM       = $1FFF
+   103                          
+   104                          COLOUR_RAM              = $9600
+   105                          COLOUR_RAM_PAGE0        = COLOUR_RAM + $0000
+   106                          COLOUR_RAM_PAGE1        = COLOUR_RAM + $0100
    107                          
-   108                          COLOUR_RAM              = $9600
-   109                          COLOUR_RAM_PAGE0        = COLOUR_RAM + $0000
-   110                          COLOUR_RAM_PAGE1        = COLOUR_RAM + $0100
-   111                          
-   112                          SCREEN_WIDTH            = 22
-   113                          SCREEN_HEIGHT           = 23
-   114                          
-   115                          COLOUR_RAM_OFFSET_MSB   = (>COLOUR_RAM) - (>SCREEN_RAM)
-   116                          
-   117                          SCREEN_RAM_LINE_00      = SCREEN_RAM + (SCREEN_WIDTH *  0)
-   118                          SCREEN_RAM_LINE_02      = SCREEN_RAM + (SCREEN_WIDTH *  2)
-   119                          
-   120                          COLOUR_RAM_LINE_00      = COLOUR_RAM + (SCREEN_WIDTH *  0)
-   121                          COLOUR_RAM_LINE_02      = COLOUR_RAM + (SCREEN_WIDTH *  2)
+   108                          SCREEN_WIDTH            = 22
+   109                          SCREEN_HEIGHT           = 23
+   110                          
+   111                          COLOUR_RAM_OFFSET_MSB   = (>COLOUR_RAM) - (>SCREEN_RAM)
+   112                          
+   113                          SCREEN_RAM_LINE_00      = SCREEN_RAM + (SCREEN_WIDTH *  0)
+   114                          SCREEN_RAM_LINE_02      = SCREEN_RAM + (SCREEN_WIDTH *  2)
+   115                          
+   116                          COLOUR_RAM_LINE_00      = COLOUR_RAM + (SCREEN_WIDTH *  0)
+   117                          COLOUR_RAM_LINE_02      = COLOUR_RAM + (SCREEN_WIDTH *  2)
+   118                          
+   119                          ;======================================================================================
+   120                          ; Maze Details
+   121                          ;======================================================================================
    122                          
-   123                          ;======================================================================================
-   124                          ; Maze Details
-   125                          ;======================================================================================          
-   126                          
-   127                          MAZE_WIDTH              = 22
-   128                          MAZE_HEIGHT             = 66
-   129                          
-   130                          MAZE_END                = SCREEN_RAM - 1
-   131                          MAZE_TOP                = MAZE_END - (MAZE_HEIGHT * MAZE_WIDTH) + 1
-   132                          
-   133                          MAZE_END_OF_TOP_LINE    = MAZE_TOP + MAZE_WIDTH - 1
-   134                          MAZE_MIDDLE             = MAZE_TOP + (((MAZE_HEIGHT - 1) * MAZE_WIDTH) / 2 )
-   135                          MAZE_LAST_LINE          = MAZE_END - MAZE_WIDTH + 1
-   136                          MAZE_START_ME           = MAZE_END - (MAZE_WIDTH * 2.5)
-   137                          MAZE_START_OFFSET       = MAZE_END - (MAZE_WIDTH * 14) + 1
-   138                          
-   139                          SCREEN_LINE_ABOVE_ME    = SCREEN_RAM + (SCREEN_WIDTH * 11) - 1      ; 1EF1
-   140                          SCREEN_START_ME         = SCREEN_RAM + (SCREEN_WIDTH * 11.5) - 1    ; 1EFC
-   141                          SCREEN_LINE_BELOW_ME    = SCREEN_RAM + (SCREEN_WIDTH * 12)          ; 1F08
-   142                          
+   123                          MAZE_WIDTH              = 22
+   124                          MAZE_HEIGHT             = 66
+   125                          
+   126                          MAZE_END                = SCREEN_RAM - $0101
+   127                          MAZE_TOP                = MAZE_END - (MAZE_HEIGHT * MAZE_WIDTH) + 1
+   128                          
+   129                          MAZE_END_OF_TOP_LINE    = MAZE_TOP + MAZE_WIDTH - 1
+   130                          MAZE_START_OF_BOMB_LINE = MAZE_TOP + (MAZE_WIDTH * 10)
+   131                          MAZE_DEBUG_OFFSET       = MAZE_TOP + (MAZE_WIDTH * 22)
+   132                          MAZE_MIDDLE             = MAZE_TOP + (((MAZE_HEIGHT - 1) * MAZE_WIDTH) / 2 )
+   133                          MAZE_LAST_LINE          = MAZE_END - MAZE_WIDTH + 1
+   134                          MAZE_PLAYER_START       = MAZE_END - (MAZE_WIDTH * 2.5)
+   135                          MAZE_START_OFFSET       = MAZE_END - (MAZE_WIDTH * 14) + 1
+   136                          
+   137                          SCREEN_LINE_ABOVE_ME    = SCREEN_RAM + (SCREEN_WIDTH * 11) - 1      ; 1EF1
+   138                          SCREEN_START_ME         = SCREEN_RAM + (SCREEN_WIDTH * 11.5) - 1    ; 1EFC
+   139                          SCREEN_LINE_BELOW_ME    = SCREEN_RAM + (SCREEN_WIDTH * 12)          ; 1F08
+   140                          
+   141                          ;======================================================================================
+   142                          ; Characters
    143                          ;======================================================================================
-   144                          ; Characters
-   145                          ;======================================================================================          
-   146                          
-   147                          CHAR_V                   = $16
-   148                          CHAR_UP_ARROW            = $1E
-   149                          CHAR_SPACE               = $20
-   150                          CHAR_ASTERISK            = $2A
-   151                          CHAR_LESS_THAN           = $3C
-   152                          CHAR_GREATER_THAN        = $3E
-   153                          CHAR_INVERSE_CIRCLE      = $D1
-   154                          
-   155                          ;======================================================================================
-   156                          ; Game characters
-   157                          ;======================================================================================
-   158                          
-   159                          CHAR_WALL                = CHAR_INVERSE_CIRCLE
-   160                          CHAR_PATH                = CHAR_SPACE
-   161                          CHAR_UP                  = CHAR_UP_ARROW
-   162                          CHAR_DOWN                = CHAR_V
-   163                          CHAR_LEFT                = CHAR_LESS_THAN
-   164                          CHAR_RIGHT               = CHAR_GREATER_THAN
-   165                          CHAR_BOMB                = CHAR_ASTERISK
-   166                          
-   167                          MOVE_UP                  = -22
-   168                          MOVE_DOWN                = 22
-   169                          MOVE_LEFT                = -1
-   170                          MOVE_RIGHT               = 1
+   144                          
+   145                          CHAR_V                  = $16
+   146                          CHAR_UP_ARROW           = $1E
+   147                          CHAR_SPACE              = $20
+   148                          CHAR_ASTERISK           = $2A
+   149                          CHAR_LESS_THAN          = $3C
+   150                          CHAR_GREATER_THAN       = $3E
+   151                          CHAR_CIRCLE             = $51
+   152                          INVERSE                 = $80
+   153                          
+   154                          ;======================================================================================
+   155                          ; Game data
+   156                          ;======================================================================================
+   157                          
+   158                          CHAR_WALL                = CHAR_CIRCLE + INVERSE
+   159                          CHAR_PATH                = CHAR_SPACE
+   160                          CHAR_UP                  = CHAR_UP_ARROW
+   161                          CHAR_DOWN                = CHAR_V
+   162                          CHAR_LEFT                = CHAR_LESS_THAN
+   163                          CHAR_RIGHT               = CHAR_GREATER_THAN
+   164                          CHAR_BOMB                = CHAR_ASTERISK
+   165                          
+   166                          ; direction indexes
+   167                          RIGHT                    = 0
+   168                          UP                       = 1
+   169                          LEFT                     = 2
+   170                          DOWN                     = 3
    171                          
-   172                          KEY_F7                   = $3F
-   173                          
-   174                          ;======================================================================================
-   175                          ; Colours
-   176                          ;======================================================================================          
-   177                          COLOUR_BLACK             = $00
-   178                          COLOUR_WHITE             = $01
-   179                          COLOUR_RED               = $02
-   180                          COLOUR_CYAN              = $03
-   181                          COLOUR_VIOLET            = $04
-   182                          COLOUR_PURPLE            = $04 ; == VIOLET
-   183                          COLOUR_GREEN             = $05
-   184                          COLOUR_BLUE              = $06
-   185                          COLOUR_YELLOW            = $07
-   186                          COLOUR_ORANGE            = $08
-   187                          COLOUR_BROWN             = $09
-   188                          COLOUR_LIGHTRED          = $0A
-   189                          COLOUR_GRAY1             = $0B
-   190                          COLOUR_GRAY2             = $0C
-   191                          COLOUR_LIGHTGREEN        = $0D
-   192                          COLOUR_LIGHTBLUE         = $0E
-   193                          COLOUR_GRAY3             = $0F
-   194                          
-   195                          ;======================================================================================
-   196                          ; BASIC Tokens
-   197                          ;======================================================================================
-   198                          SYS                      = $9E
-   199                          
+   172                          ; direction offsets
+   173                          MOVE_UP                  = -MAZE_WIDTH
+   174                          MOVE_DOWN                = MAZE_WIDTH
+   175                          MOVE_LEFT                = -1
+   176                          MOVE_RIGHT               = 1
+   177                          
+   178                          KEY_F7                   = $3F
+   179                          
+   180                          ;======================================================================================
+   181                          ; Colours
+   182                          ;======================================================================================
+   183                          COLOUR_BLACK             = $00
+   184                          COLOUR_WHITE             = $01
+   185                          COLOUR_RED               = $02
+   186                          COLOUR_CYAN              = $03
+   187                          COLOUR_VIOLET            = $04
+   188                          COLOUR_PURPLE            = $04 ; == VIOLET
+   189                          COLOUR_GREEN             = $05
+   190                          COLOUR_BLUE              = $06
+   191                          COLOUR_YELLOW            = $07
+   192                          COLOUR_ORANGE            = $08
+   193                          COLOUR_BROWN             = $09
+   194                          COLOUR_LIGHTRED          = $0A
+   195                          COLOUR_GRAY1             = $0B
+   196                          COLOUR_GRAY2             = $0C
+   197                          COLOUR_LIGHTGREEN        = $0D
+   198                          COLOUR_LIGHTBLUE         = $0E
+   199                          COLOUR_GRAY3             = $0F
+   200                          
+   201                          ;======================================================================================
+   202                          ; BASIC Tokens
+   203                          ;======================================================================================
+   204                          SYS                      = $9E
+   205                          
 
 ; ******** Source: timebomb.asm
     15                          
@@ -229,839 +235,862 @@
     25  100b 0000                   !word 0                             ; end of BASIC stub
     26                          
     27                          ;===================================================================================================
-    28                          ; Starting point
+    28                          ; Initialise
     29                          ;===================================================================================================
-    30                          ; start:
-    31  100d ad1891                 lda VIA1_TIMER2_LSB                 ; seed RND from the VIA timer
-    32  1010 8510                   sta SEED_LSB
-    33  1012 ad1991                 lda VIA1_TIMER2_MSB
-    34  1015 8511                   sta SEED_MSB
-    35                          
-    36                          L1:
-    37  1017 a000                   ldy #0                              ; (leave Y as 0)
-    38                          
-    39                          ; some variables that are initialised to 0 by BASIC
-    40  1019 8452                   sty F                               ; f = 0
-    41  101b 8440                   sty R_UNITS                         ; r = 0
-    42  101d 8441                   sty R_TENS                          ;
-    43  101f 843c                   sty K_UNITS                         ; k = 0
-    44  1021 843d                   sty K_TENS                          ; 
-    45                          
-    46                          ; 2 poke 56, 24 : poke 55, 103 : gosub 29
-    47                              ; set memory limits, normally $1E00 to $1867
-    48                              ; stops the BASIC heap getting in the way of the maze - not required
-    49                              ; gosub 29 not required as that pokes assembler from data statments into the cassette buffer
-    50                          
-    51                          ; 3 d = 37154 : p1 = d-3 : p2 = d-2 : df = 30720 : v = 36878 : s = v-4 : m1 = 30 : x = 50 : goto 19
-    52                          ; d  = constant = 37154 = 9122 = VIA#2 DDRB (keyboard column scan + joy3)
-    53                          ; p1 = constant = 37151 = 911F = VIA#1 PortA (joy0,1,2,fire)
-    54                          ; p2 = constant = 37152 = 9120 = VIA#2 PortB (joy3)
-    55                          ; df = constant = 30720 = 7800 = display offset
-    56                          ; v  = constant = 36878 = 900E = VIC volume / aux colour
-    57                          ; s  = constant = 36874 = 900A = VIC oscillator 1 frequency
-    58                          L3:
-    59  1023 a91e                   lda #CHAR_UP                        ; m1 = 30 = ^
-    60  1025 8553                   sta M1
-    61                          
-    62  1027 a905                   lda #5                              ; x = 50
-    63  1029 853f                   sta X_TENS                          ; Tens and units stored separately to avoid several divide by 10s
-    64                                                                  ; (X_UNITS is always 0, so is optimised out)
-    65                          
-    66                          ;===================================================================================================
-    67                          ; Draw the maze
-    68                          ;===================================================================================================
-    69                          ; 19 dim a(3) : a(0) = 2 : a(1) = -44 : a(2) = -2 : a(3) = 44 : wl = 209 : hl = 32 : sc = 6228 : a9 = 6943
-    70                          L19:
-    71                          ; a = 2, -44, -2, 44
-    72  102b a902                   lda #2
-    73  102d 8520                   sta ARRAY
-    74  102f a9d4                   lda #-44
-    75  1031 8521                   sta ARRAY+1
-    76  1033 a9fe                   lda #-2
-    77  1035 8522                   sta ARRAY+2
-    78  1037 a92c                   lda #44
-    79  1039 8523                   sta ARRAY+3
-    80                          
-    81                          ; also create a half value version to avoid having to recalculate each time
-    82  103b a901                   lda #1
-    83  103d 8524                   sta ARRAY_HALF
-    84  103f a9ea                   lda #-22
-    85  1041 8525                   sta ARRAY_HALF+1
-    86  1043 a9ff                   lda #-1
-    87  1045 8526                   sta ARRAY_HALF+2
-    88  1047 a916                   lda #22
-    89  1049 8527                   sta ARRAY_HALF+3
-    90                          
-    91                          ; 20 sys 861 : print "{clear} {down}making maze"
-    92                          ; wl=209 - constant "Wall" (inverse circle)
-    93                          ; hl=32 - constant "Hall" (space)
-    94                          ; sc=6228
-    95  104b a954                   lda #<MAZE_TOP                      ; set SC and DST to 6228 ($1854), the top of the maze
-    96  104d 850a                   sta DST_LSB
-    97  104f 8530                   sta SC_LSB
-    98  1051 a918                   lda #>MAZE_TOP
-    99  1053 850b                   sta DST_MSB
-   100  1055 8531                   sta SC_MSB
-   101                          
-   102                          ; a9=6943
-   103  1057 a91f                   lda #<MAZE_MIDDLE                   ; set A9 to 6943 ($1B1F), about the middle of the maze
-   104  1059 8532                   sta A9_LSB
-   105  105b a91b                   lda #>MAZE_MIDDLE
-   106  105d 8533                   sta A9_MSB
-   107                          
-   108                          ;===================================================================================================
-   109                          ; SYS 861 - fill maze with walls
-   110                          ;===================================================================================================
-   111  105f a21e                   ldx #>MAZE_END+1                    ; end point
+    30  100d ad1891                 lda VIA1_TIMER2_LSB                 ; seed RND from the VIA timer
+    31  1010 8507                   sta SEED_LSB
+    32  1012 ad1991                 lda VIA1_TIMER2_MSB
+    33  1015 8508                   sta SEED_MSB
+    34                          
+    35                          start:
+    36  1017 a000                   ldy #0                              ; (leave Y as 0)
+    37                          
+    38  1019 8432                   sty FOUND                           ; not found
+    39  101b 842c                   sty ROUND_UNITS                     ; rount 0
+    40  101d 842d                   sty ROUND_TENS                      ;
+    41  101f 842e                   sty TIMER_UNITS                     ; timer 0
+    42  1021 842f                   sty TIMER_TENS                      ;
+    43  1023 8435                   sty PENALTY                         ; no penalty to start with
+    44                          
+    45  1025 a91e                   lda #CHAR_UP                        ; Initial player character facing North
+    46  1027 8533                   sta PLAYER_CHARACTER
+    47                          
+    48                          ;===================================================================================================
+    49                          ; Prepare the data structures
+    50                          ;===================================================================================================
+    51                          
+    52                          ; All arrays are indexed on direction
+    53                              ; 0 = right
+    54                              ; 1 = up
+    55                              ; 2 = left
+    56                              ; 3 = down
+    57                          
+    58                          ; Build the single direction array
+    59  1029 a901                   lda #MOVE_RIGHT
+    60  102b 8510                   sta DIRECTION
+    61  102d a9ea                   lda #MOVE_UP
+    62  102f 8511                   sta DIRECTION + 1
+    63  1031 a9ff                   lda #MOVE_LEFT
+    64  1033 8512                   sta DIRECTION + 2
+    65  1035 a916                   lda #MOVE_DOWN
+    66  1037 8513                   sta DIRECTION + 3
+    67                          
+    68                          ; Build the double direction array
+    69  1039 a902                   lda #2*MOVE_RIGHT
+    70  103b 8514                   sta DOUBLE_DIRECTION
+    71  103d a9d4                   lda #2*MOVE_UP
+    72  103f 8515                   sta DOUBLE_DIRECTION + 1
+    73  1041 a9fe                   lda #2*MOVE_LEFT
+    74  1043 8516                   sta DOUBLE_DIRECTION + 2
+    75  1045 a92c                   lda #2*MOVE_DOWN
+    76  1047 8517                   sta DOUBLE_DIRECTION + 3
+    77                          
+    78                          ; build the direction character array
+    79  1049 a93e                   lda #CHAR_RIGHT
+    80  104b 8518                   sta CHAR_DIRECTION
+    81  104d a91e                   lda #CHAR_UP
+    82  104f 8519                   sta CHAR_DIRECTION + 1
+    83  1051 a93c                   lda #CHAR_LEFT
+    84  1053 851a                   sta CHAR_DIRECTION + 2
+    85  1055 a916                   lda #CHAR_DOWN
+    86  1057 851b                   sta CHAR_DIRECTION + 3
+    87                          
+    88                          ;===================================================================================================
+    89                          ; fill maze with walls
+    90                          ;===================================================================================================
+    91  1059 a954                   lda #<MAZE_TOP                      ; DST points to the top of the maze
+    92  105b 8505                   sta DST_LSB
+    93  105d a917                   lda #>MAZE_TOP
+    94  105f 8506                   sta DST_MSB
+    95                          
+    96  1061 a21d                   ldx #>MAZE_END+1                    ; pre-calculate the end point
+    97                          
+    98  1063 a9d1                   lda #CHAR_WALL                      ; fill with wall characters
+    99                          -
+   100  1065 9105                   sta (DST),y
+   101  1067 e605                   inc DST_LSB
+   102  1069 d0fa                   bne -
+   103  106b e606                   inc DST_MSB
+   104  106d e406                   cpx DST_MSB
+   105  106f d0f4                   bne -
+   106                          
+   107                          ; add all the spaces down the right hand side
+   108  1071 a917                   lda #>MAZE_END_OF_TOP_LINE          ; start at the end of the top line
+   109  1073 8506                   sta DST_MSB
+   110  1075 a969                   lda #<MAZE_END_OF_TOP_LINE
+   111  1077 8505                   sta DST_LSB
    112                          
-   113  1061 a9d1                   lda #CHAR_WALL                      ; fill with wall characters
-   114                          -
-   115  1063 910a                   sta (DST),y 
-   116  1065 e60a                   inc DST_LSB
-   117  1067 d0fa                   bne -
-   118  1069 e60b                   inc DST_MSB
-   119  106b e40b                   cpx DST_MSB
-   120  106d d0f4                   bne -
-   121                          
-   122                          ; 21 for t = sc+21 to 7679 step 22 : poke t, 32 : next : for t = sc to sc+21 : poke t, 32 : next
-   123                              ; add all the spaces down the right hand side
-   124  106f a918                   lda #>MAZE_END_OF_TOP_LINE          ; start at SC + 21
-   125  1071 850b                   sta DST_MSB
-   126  1073 a969                   lda #<MAZE_END_OF_TOP_LINE
-   127  1075 850a                   sta DST_LSB
-   128                          
-   129  1077 a242                   ldx #MAZE_HEIGHT                    ; 66 times
-   130                              
-   131  1079 a920               -   lda #CHAR_PATH                      ; store a space
-   132  107b 910a                   sta (DST),y
-   133                          
-   134  107d a50a                   lda DST_LSB                         ; add 22
-   135  107f 18                     clc
-   136  1080 6916                   adc #MAZE_WIDTH
-   137  1082 850a                   sta DST_LSB
-   138  1084 9002                   bcc +
-   139  1086 e60b                   inc DST_MSB
-   140                          +
-   141  1088 ca                     dex                                 ; check if we have hit $1E00 (7679)
-   142  1089 d0ee                   bne -
+   113  1079 a242                   ldx #MAZE_HEIGHT                    ; 66 times
+   114                          
+   115  107b a920               -   lda #CHAR_PATH                      ; store a space
+   116  107d 9105                   sta (DST),y
+   117                          
+   118  107f a505                   lda DST_LSB                         ; move down 1 line
+   119  1081 18                     clc
+   120  1082 6916                   adc #MAZE_WIDTH
+   121  1084 8505                   sta DST_LSB
+   122  1086 9002                   bcc +
+   123  1088 e606                   inc DST_MSB
+   124                          +
+   125  108a ca                     dex                                 ; loop until complete
+   126  108b d0ee                   bne -
+   127                          
+   128                          ; add a row of spaces at the top and bottom
+   129  108d a920                   lda #CHAR_PATH                      ; store a space
+   130  108f a216                   ldx #MAZE_WIDTH                     ; over the whole maze width
+   131                          
+   132  1091 ca                 -   dex
+   133  1092 9d5417                 sta MAZE_TOP,x
+   134  1095 9d001d                 sta MAZE_END+1,x
+   135  1098 d0f7                   bne -
+   136                          
+   137                          ; leave a space where the player starts
+   138  109a 8dc81c                 sta MAZE_PLAYER_START
+   139                          
+   140                          ;===================================================================================================
+   141                          ; Build the paths
+   142                          ;===================================================================================================
    143                          
-   144                              ; add a row of spaces at the top  
-   145  108b a920                   lda #CHAR_PATH                      ; store a space
-   146  108d a216                   ldx #MAZE_WIDTH                     ; 22 times
-   147                          
-   148  108f ca                 -   dex
-   149  1090 9d5418                 sta MAZE_TOP,x
-   150  1093 d0fa                   bne -
+   144                          ; start in the middle
+   145  109d a91f                   lda #<MAZE_MIDDLE                   ; set current sqaureto the middle of the maze
+   146  109f 8520                   sta CURRENT_SQUARE_LSB
+   147  10a1 a91a                   lda #>MAZE_MIDDLE
+   148  10a3 8521                   sta CURRENT_SQUARE_MSB
+   149                          
+   150                          next_move:
    151                          
-   152  1095 8dc81d                 sta MAZE_START_ME                   ; leave a space where the player starts
+   152                          ;######################## DEBUG ##################################
    153                          
-   154                          ; make the paths
-   155                          ; 22 j = int(rnd(1)*4) : x3 = j
-   156                          L22:
-   157  1098 20d213                 jsr RAND16                          ; get a random number
-   158  109b 2903                   and #$03                            ; mask off all but the lower two bits (A=0-3)
-   159                          
-   160  109d 8551                   sta J
-   161  109f 8550                   sta X3
-   162                          
-   163                          ; 23 b = a9 + a(j)
-   164                          L23:
-   165                              ; interesting challenge, add an 8 bit signed value to a 16 bit unsigned number
-   166  10a1 a651                   ldx J                               ; get the random number in X
+   154                          ; DEBUG_SRC_LSB           = $F0
+   155                          ; DEBUG_SRC_MSB           = $F1
+   156                          ; DEBUG_SRC               = DEBUG_SRC_LSB
+   157                          
+   158                          ; DEBUG_DST_LSB           = $F2
+   159                          ; DEBUG_DST_MSB           = $F3
+   160                          ; DEBUG_DST               = DEBUG_DST_LSB
+   161                          
+   162                          ;     lda #COLOUR_BLUE                    ; all text colour to blue
+   163                          ; -   sta COLOUR_RAM_PAGE0,y
+   164                          ;     sta COLOUR_RAM_PAGE1,y
+   165                          ;     iny
+   166                          ;     bne -
    167                          
-   168  10a3 a533                   lda A9_MSB                          ; copy the MSB first so it can be adjusted based on what happens to the LSB
-   169  10a5 8535                   sta B_MSB
-   170                          
-   171  10a7 b520                   lda ARRAY,x                         ; get the signed direction offset
-   172  10a9 1002                   bpl +
-   173  10ab c635                   dec B_MSB                           ; if the offset is negative, decrement the MSB
-   174  10ad 18                 +   clc
-   175  10ae 6532                   adc A9_LSB                          ; now add the LSB
-   176  10b0 8534                   sta B_LSB
-   177  10b2 9002                   bcc +
-   178  10b4 e635                   inc B_MSB                           ; increment MSB if there was a carry
-   179                          +
-   180                          
-   181                          ; 24 if peek(b) = wl then poke b, j : poke a9 + a(j)/2, hl : a9 = b : goto 22
-   182  10b6 b134                   lda (B),y                           ; check what is pointed at by B, Y is 0
-   183  10b8 c9d1                   cmp #CHAR_WALL                      ; is it a wall (wl)?
-   184  10ba d02e                   bne L25
-   185                          
-   186  10bc a551                   lda J                               ; store the direction number instead
-   187  10be 9134                   sta (B),y
-   188                          
-   189                              ; poke a9 +a(j)/2, hl  Oh boy.
+   168                          ;     lda #<MAZE_DEBUG_OFFSET
+   169                          ;     sta DEBUG_SRC_LSB
+   170                          ;     lda #>MAZE_DEBUG_OFFSET
+   171                          ;     sta DEBUG_SRC_MSB
+   172                          
+   173                          ;     sty DEBUG_DST_LSB                   ; set the destination to the screen at 1E00
+   174                          ;     lda #>SCREEN_RAM
+   175                          ;     sta DEBUG_DST_MSB
+   176                          
+   177                          ; -   lda (DEBUG_SRC),y                   ; copy character
+   178                          ;     cmp #4
+   179                          ;     bcs +
+   180                          ;     ;clc                                 ; 0-3 -> "0"-"3"
+   181                          ;     ;adc #$30
+   182                          ;     tax                                 ; 0-3 -> direction characters
+   183                          ;     lda CHAR_DIRECTION,x
+   184                          ; +
+   185                          ;     sta (DEBUG_DST),y
+   186                          
+   187                          ;     inc DEBUG_SRC_LSB
+   188                          ;     bne +
+   189                          ;     inc DEBUG_SRC_MSB
    190                          
-   191                              ; safe to mangle A9 as it is set to a different value later
-   192                          
-   193  10c0 b524                   lda ARRAY_HALF,x                    ; get half the signed direction offset
-   194  10c2 1002                   bpl +
-   195  10c4 c633                   dec A9_MSB                          ; if the offset is negative, decrement the MSB
-   196  10c6 18                 +   clc
-   197  10c7 6532                   adc A9_LSB                          ; now add the LSB
-   198  10c9 8532                   sta A9_LSB
-   199  10cb 9002                   bcc +
-   200  10cd e633                   inc A9_MSB                          ; increment MSB if there was a carry
-   201                          +
-   202                          
-   203  10cf a533                   lda A9_MSB                          ; check it's not the last line
-   204  10d1 c91d                   cmp #>MAZE_LAST_LINE
-   205  10d3 d004                   bne +
-   206  10d5 a532                   lda A9_LSB
-   207  10d7 c9ea                   cmp #<MAZE_LAST_LINE
-   208  10d9 b004               +   bcs +                               ; skip if on last line
-   209                          
-   210  10db a920                   lda #CHAR_PATH                      ; set this to a space (hl)
-   211  10dd 9132                   sta (A9),y
-   212                          
-   213  10df a535               +   lda B_MSB                           ; a9 = b
-   214  10e1 8533                   sta A9_MSB
-   215  10e3 a534                   lda B_LSB
-   216  10e5 8532                   sta A9_LSB
-   217                          
-   218  10e7 4c9810                 jmp L22
-   219                          
-   220                          ; not a wall
-   221                          ; 25 j = (j+1) * -(j<3) : if j <> x3 then 23
-   222                          L25:   
-   223                              ;   j   (j+1)*-(j<3)    =
-   224                              ; -------------------------
-   225                              ;   0     1  *   1      1
-   226                              ;   1     2  *   1      2
-   227                              ;   2     3  *   1      3
-   228                              ;   3     4  *   0      0
-   229                          
-   230  10ea e651                   inc J                               ; 0123 > 1234
-   231  10ec a551                   lda J                               ; 
-   232  10ee 2903                   and #$03                            ; 1234 > 1230
-   233  10f0 8551                   sta J                               ; 
-   234  10f2 c550                   cmp X3                              ; = X3?
-   235  10f4 d0ab                   bne L23
-   236                          
-   237                          ; 26 j = peek(a9) : poke a9, hl : if j<4 then a9 = a9-a(j) : goto 22
-   238  10f6 b132                   lda (A9),y
-   239  10f8 8551                   sta J
-   240  10fa aa                     tax                                 ; save J for later
-   241  10fb a920                   lda #CHAR_PATH 
-   242  10fd 9132                   sta (A9),y
-   243                          
-   244  10ff e004                   cpx #4                              ; J<4?
-   245  1101 b016                   bcs L27
-   246                          
-   247                              ; here we go again, subtract an 8 bit signed value from a 16 bit unsigned number
-   248                          
-   249  1103 b520                   lda ARRAY,x                         ; get signed direction offset
-   250  1105 8500                   sta TEMP                            ; save for later
-   251  1107 1002                   bpl +
-   252  1109 e633                   inc A9_MSB                          ; if the offset is negative, increment the MSB
-   253  110b 38                 +   sec
-   254  110c a532                   lda A9_LSB                          ; now subtract the offset from the LSB
-   255  110e e500                   sbc TEMP
-   256  1110 8532                   sta A9_LSB
-   257  1112 b002                   bcs +
-   258  1114 c633                   dec A9_MSB                          ; decrement MSB if there was a carry
-   259                          +
-   260  1116 4c9810                 jmp L22
-   261                          
-   262                          ; Set the location of the timebomb
-   263                          ; 27 tb = sc + int(rnd(0)*20) + 220 : if (peek(tb) <> 32) goto 27 else poke tb, 42
-   264                          L27:
-   265  1119 843a                   sty OM_LSB                          ; clear the old me position 
-   266  111b 843b                   sty OM_MSB
-   267                          
-   268  111d a531                   lda SC_MSB                          ; start with the MSB.
-   269  111f 8537                   sta TB_MSB
-   270                          
-   271                              ;   OK, so I want a random number from 0-19.
-   272                          
-   273  1121 20d213                 jsr RAND16                          ; A now contains an 8 bit random number
-   274  1124 2903                   and #$03                            ; now have number from 0-3
-   275  1126 8500                   sta TEMP                            ; save for later
-   276  1128 a510                   lda SEED_LSB                        ; get another 8 bits of random number
-   277  112a 290f                   and #$0F                            ; now have a number from 0-15
-   278  112c 18                     clc
-   279  112d 6500                   adc TEMP                            ; now add the number from 0-3 and we have a number from 0-19 Yay!
-   280                          
-   281  112f 69dc                   adc #$DC                            ; add 220 (will not be > 255, so no need to check carry)
-   282  1131 6530                   adc SC_LSB                          ; now add the LSB
-   283  1133 8536                   sta TB_LSB
-   284  1135 9002                   bcc +                               ; incrememnt MSB if necessary
-   285  1137 e637                   inc TB_MSB
-   286                          +
-   287  1139 b136                   lda (TB),y                          ; lets see what's at this timebomb location
-   288  113b c920                   cmp #CHAR_PATH                      ; is it a space?
-   289  113d d0da                   bne L27                             ; no, then try again
-   290                          
-   291  113f a92a                   lda #CHAR_BOMB                      ; plant the timebomb
-   292  1141 9136                   sta (TB),y
-   293                          
-   294                          
-   295                          ; 28 sys 830 : poke 828, 204 : poke 829, 28 : sys 923 : goto 4
-   296                          ;===================================================================================================
-   297                          ; SYS 830 - setup VIC and fill the colour memory
-   298                          ;===================================================================================================
-   299  1143 a9ee                   lda #$EE                            ; set the screen and border colours purple / light blue
-   300  1145 8d0f90                 sta VIC_BORDER
-   301                          
-   302  1148 a90a                   lda #COLOUR_LIGHTRED                ; all text colour to light red
-   303  114a 990096             -   sta COLOUR_RAM_PAGE0,y
-   304  114d 990097                 sta COLOUR_RAM_PAGE1,y
-   305  1150 c8                     iny
-   306  1151 d0f7                   bne -
-   307                          
-   308  1153 a9cc                   lda #<MAZE_START_OFFSET             ; maze offset to $1CCC (middle left hand edge)
-   309  1155 8542                   sta OFFSET_LSB
-   310  1157 a91c                   lda #>MAZE_START_OFFSET
-   311  1159 8543                   sta OFFSET_MSB
-   312                          
-   313  115b 209f13                 jsr sys923                          ; redraw maze
-   314                          
-   315                          ;===================================================================================================
-   316                          ; Intro Sound
-   317                          ;===================================================================================================
-   318                          ; 4 for t = 240 to 208 step -4 : poke s, t : for tt = 0 to 30 : poke v, tt/2 : next : next t : poke s, 0 : me = 7932
-   319                          L4:
-   320  115e a9f0                   lda #$F0                            ; Start at 240
-   321                          
-   322                          L4_2:
-   323  1160 990a90                 sta VIC_OSC1_FREQ, y                ; Tick, tick
-   324  1163 a200                   ldx #0
-   325                          
-   326                          L4_3:
-   327  1165 8e0e90                 stx VIC_VOLUME
-   328                          
-   329  1168 a20c                   ldx #$0C                            ; short delay
-   330  116a 88                 -   dey                                 ;
-   331  116b d0fd                   bne -                               ;
-   332  116d ca                     dex                                 ;
-   333  116e d0fa                   bne -                               ;
-   334                          
-   335  1170 ae0e90                 ldx VIC_VOLUME                      ; get X back
-   336  1173 e8                     inx
-   337  1174 e00f                   cpx #$0F
-   338  1176 d0ed                   bne L4_3
-   339  1178 8e0e90                 stx VIC_VOLUME                      ; the last of the 30 cycles will write 15 once
-   340                          
-   341  117b 38                     sec
-   342  117c e904                   sbc #04
-   343  117e c9d0                   cmp #$D0                            ; reached 208?
-   344  1180 b0de                   bcs L4_2
+   191                          ; +   inc DEBUG_DST_LSB
+   192                          ;     bne -
+   193                          ;     inc DEBUG_DST_MSB
+   194                          ;     lda DEBUG_DST_MSB                   ; check for end of screen RAM
+   195                          ;     cmp #$20
+   196                          ;     bne -                               ; not finished yet, continue
+   197                          
+   198                          ;     ldx #$08                            ; delay
+   199                          ; -   dey                                 ;
+   200                          ;     bne -                               ;
+   201                          ;     dex                                 ;
+   202                          ;     bne -                               ;
+   203                          
+   204                          ;#####################################################################
+   205                          
+   206                          
+   207                          ; get a random direction
+   208  10a5 20ac13                 jsr RAND16                          ; get a random number
+   209  10a8 2903                   and #$03                            ; mask off all but the lower two bits (A=0-3)
+   210                          
+   211  10aa 8531                   sta DIRECTION_INDEX                 ; save the number
+   212  10ac 8530                   sta INITIAL_DIRECTION
+   213                          
+   214                          start_path:
+   215                          ; work out the location two squares in that direction
+   216  10ae a521                   lda CURRENT_SQUARE_MSB              ; copy the MSB first
+   217  10b0 8523                   sta CHECK_SQUARE_MSB
+   218                          
+   219  10b2 a631                   ldx DIRECTION_INDEX                 ; put the current direction into X
+   220  10b4 b514                   lda DOUBLE_DIRECTION,x              ; get the signed direction offset
+   221                          
+   222  10b6 1002                   bpl +                               ; 2 places in the direction
+   223  10b8 c623                   dec CHECK_SQUARE_MSB                ; if the offset is negative, decrement the MSB
+   224  10ba 18                 +   clc
+   225  10bb 6520                   adc CURRENT_SQUARE_LSB              ; now add the LSB
+   226  10bd 8522                   sta CHECK_SQUARE_LSB
+   227  10bf 9002                   bcc +
+   228  10c1 e623                   inc CHECK_SQUARE_MSB                ; increment MSB if there was a carry
+   229                          +
+   230                          
+   231                          ; is there a wall there?
+   232  10c3 b122                   lda (CHECK_SQUARE),y                ; check what is at the check square (Y=0)
+   233  10c5 c9d1                   cmp #CHAR_WALL                      ; is it a wall?
+   234  10c7 d021                   bne not_wall                        ; no, a previous path or the edge, skip
+   235                          
+   236  10c9 8a                     txa                                 ; store the direction index there
+   237  10ca 9122                   sta (CHECK_SQUARE),y
+   238                          
+   239                          ; work out the location of the square between here and where we just checked
+   240  10cc b510                   lda DIRECTION,x                     ; get the signed direction offset
+   241                          
+   242  10ce 1002                   bpl +
+   243  10d0 c621                   dec CURRENT_SQUARE_MSB              ; if the offset is negative, decrement the MSB
+   244  10d2 18                 +   clc
+   245  10d3 6520                   adc CURRENT_SQUARE_LSB              ; now add the LSB
+   246  10d5 8520                   sta CURRENT_SQUARE_LSB
+   247  10d7 9002                   bcc +
+   248  10d9 e621                   inc CURRENT_SQUARE_MSB              ; increment MSB if there was a carry
+   249                          +
+   250                          
+   251  10db a920                   lda #CHAR_PATH                      ; set this to a path (space)
+   252  10dd 9120                   sta (CURRENT_SQUARE),y
+   253                          
+   254                          ; jump over the newly created space to the one we previously looked at
+   255                          ; this is basically draughts
+   256  10df a523                   lda CHECK_SQUARE_MSB
+   257  10e1 8521                   sta CURRENT_SQUARE_MSB
+   258  10e3 a522                   lda CHECK_SQUARE_LSB
+   259  10e5 8520                   sta CURRENT_SQUARE_LSB
+   260                          
+   261  10e7 4ca510                 jmp next_move                       ; keep moving
+   262                          
+   263                          ; we hit a previous path or the edge of the screen
+   264                          not_wall:
+   265                              ; rotate 90 degrees counter-clockwise
+   266                          
+   267                              ; 0 = right -> up
+   268                              ; 1 = up    -> left
+   269                              ; 2 = left  -> down
+   270                              ; 3 = down  -> right
+   271                          
+   272  10ea e631                   inc DIRECTION_INDEX                 ; 0123 > 1234
+   273  10ec a531                   lda DIRECTION_INDEX                 ;
+   274  10ee 2903                   and #$03                            ; 1234 > 1230
+   275  10f0 8531                   sta DIRECTION_INDEX                 ;
+   276                          
+   277  10f2 c530                   cmp INITIAL_DIRECTION               ; are we back to the direction we started?
+   278  10f4 d0b8                   bne start_path                      ; no, have another go
+   279                          
+   280                          ; check the current square
+   281  10f6 b120                   lda (CURRENT_SQUARE),y              ; x is what is at the current square
+   282  10f8 aa                     tax
+   283                          
+   284  10f9 a920                   lda #CHAR_PATH                      ; now make it a path
+   285  10fb 9120                   sta (CURRENT_SQUARE),y
+   286                          
+   287  10fd e004                   cpx #4                              ; was it a previous direction index number?
+   288  10ff b016                   bcs next_round                      ; no, we must be back at the start, the maze is complete
+   289                          
+   290                          ; we can't go any further from this point, in any direction, retrace our steps
+   291  1101 b514                   lda DOUBLE_DIRECTION,x              ; get signed direction offset
+   292  1103 8502                   sta TEMP                            ; save for later
+   293  1105 1002                   bpl +
+   294  1107 e621                   inc CURRENT_SQUARE_MSB              ; if the offset is negative, increment the MSB
+   295  1109 38                 +   sec
+   296  110a a520                   lda CURRENT_SQUARE_LSB              ; now subtract the offset from the LSB
+   297  110c e502                   sbc TEMP
+   298  110e 8520                   sta CURRENT_SQUARE_LSB
+   299  1110 b002                   bcs +
+   300  1112 c621                   dec CURRENT_SQUARE_MSB              ; decrement MSB if there was a carry
+   301                          +
+   302  1114 4ca510                 jmp next_move
+   303                          
+   304                          ;===================================================================================================
+   305                          ; Start a new round
+   306                          ;===================================================================================================
+   307                          next_round:
+   308  1117 8428                   sty OLD_PLAYER_LSB                  ; clear the old me position
+   309  1119 8429                   sty OLD_PLAYER_MSB
+   310                          
+   311                          ; Set the location of the timebomb
+   312                          ; the bomb is always on the 10th row from the top, but any position horizontally
+   313                          select_bomb_location:
+   314  111b a918                   lda #>MAZE_START_OF_BOMB_LINE       ; start with the MSB.
+   315  111d 8525                   sta TIMEBOMB_MSB
+   316                          
+   317                          ; Get a random number from 0-19
+   318                          ; LSB masked gives number from 0-3
+   319                          ; MSB shifted into carry gives number 0-1
+   320                          ; MSB remainder masked gives number from 0-15
+   321                          ; total 0-19
+   322                          
+   323                          get_rand
+   324  111f 20ac13                 jsr RAND16                          ; A now contains an 8 bit random number
+   325  1122 2903                   and #$03                            ; now have number from 0-3
+   326  1124 8502                   sta TEMP                            ; save for later
+   327  1126 a507                   lda SEED_LSB                        ; get another 8 bits of random number
+   328  1128 6a                     ror                                 ; shift 1 bit of that number into carry, 0-1
+   329  1129 290f                   and #$0F                            ; now have a number from 0-15
+   330  112b 6502                   adc TEMP                            ; now add the number from 0-3, and the 0-1 carry
+   331                          
+   332  112d 6930                   adc #<MAZE_START_OF_BOMB_LINE       ; add to the location
+   333  112f 8524                   sta TIMEBOMB_LSB
+   334  1131 9002                   bcc +                               ; incrememnt MSB if necessary
+   335  1133 e625                   inc TIMEBOMB_MSB
+   336                          +
+   337                          
+   338                          ; check timebomb location
+   339  1135 b124                   lda (TIMEBOMB),y                    ; lets see what's at this timebomb location
+   340  1137 c920                   cmp #CHAR_PATH                      ; is it a space?
+   341  1139 d0e0                   bne select_bomb_location            ; no, then try again
+   342                          
+   343  113b a92a                   lda #CHAR_BOMB                      ; plant the timebomb
+   344  113d 9124                   sta (TIMEBOMB),y
    345                          
-   346  1182 8c0a90                 sty VIC_OSC1_FREQ                   ; stop the oscillator
-   347                          
-   348  1185 a9fc                   lda #<SCREEN_START_ME               ; set ME to $1EFC (7932) (middle of screen, starting point)
-   349  1187 8538                   sta ME_LSB
-   350  1189 a91e                   lda #>SCREEN_START_ME
-   351  118b 8539                   sta ME_MSB
-   352                          
-   353  118d a5a2                   lda JIFFY_LSB                       ; setup the timer
-   354  118f 8554                   sta LAST_JIFFY
-   355                          
-   356                          ;===================================================================================================
-   357                          ; Main Loop
-   358                          ;===================================================================================================
-   359                          ; 5 poke om, 32 : poke om+df, 10 : poke me, m1 : poke me+df, 7 : if f then 40
-   360                          L5:    
-   361  1191 a554                   lda LAST_JIFFY                      ; wait for every 8th frame
-   362  1193 18                     clc
-   363  1194 6908                   adc #$08
-   364  1196 8554                   sta LAST_JIFFY                      ; store value for next time
-   365  1198 c5a2               -   cmp JIFFY_LSB
-   366  119a d0fc                   bne -    
-   367                          
-   368  119c a920                   lda #CHAR_PATH                      ; First time around OM is 0, so writes to $0000
-   369  119e 913a                   sta (OM),y
-   370                              
-   371  11a0 a53b                   lda OM_MSB                          ; DST = OM+DF (offset from screen to colour RAM)
-   372  11a2 18                     clc
-   373  11a3 6978                   adc #COLOUR_RAM_OFFSET_MSB
-   374  11a5 850b                   sta DST_MSB
-   375                          
-   376  11a7 a53a                   lda OM_LSB                          ; DF is 32720 = $7800, so no need to alter LSB
-   377  11a9 850a                   sta DST_LSB
-   378                          
-   379  11ab a90a                   lda #COLOUR_LIGHTRED                ; set to background colour
-   380  11ad 910a                   sta (DST),y                         
-   381                          
-   382  11af a553                   lda M1                              ; poke me,m1, set the direction character
-   383  11b1 9138                   sta (ME),y
-   384                          
-   385  11b3 a539                   lda ME_MSB                          ; DST = ME+DF
-   386  11b5 18                     clc
-   387  11b6 6978                   adc #COLOUR_RAM_OFFSET_MSB
-   388  11b8 850b                   sta DST_MSB
-   389                          
-   390  11ba a538                   lda ME_LSB                          ; DF is 32720 = $7800, so no need to alter LSB
-   391  11bc 850a                   sta DST_LSB
-   392                          
-   393  11be a907                   lda #COLOUR_YELLOW                  ; set me colour yellow
-   394  11c0 910a                   sta (DST),y
+   346                          ;===================================================================================================
+   347                          ; Setup VIC and fill the colour memory
+   348                          ;===================================================================================================
+   349  113f a9ee                   lda #$EE                            ; set the screen and border colours purple / light blue
+   350  1141 8d0f90                 sta VIC_BORDER
+   351                          
+   352  1144 a90a                   lda #COLOUR_LIGHTRED                ; all text colour to light red
+   353  1146 990096             -   sta COLOUR_RAM_PAGE0,y
+   354  1149 990097                 sta COLOUR_RAM_PAGE1,y
+   355  114c c8                     iny
+   356  114d d0f7                   bne -
+   357                          
+   358  114f a9cc                   lda #<MAZE_START_OFFSET             ; set the maze offset so player is in middle of screen
+   359  1151 852a                   sta OFFSET_LSB
+   360  1153 a91b                   lda #>MAZE_START_OFFSET
+   361  1155 852b                   sta OFFSET_MSB
+   362                          
+   363  1157 207913                 jsr draw_screen                     ; draw the starting view of the maze
+   364                          
+   365                          ;===================================================================================================
+   366                          ; Intro Sound
+   367                          ;===================================================================================================
+   368                          intro:
+   369  115a a9f0                   lda #$F0                            ; Start at 240
+   370                          
+   371                          intro1:
+   372  115c 990a90                 sta VIC_OSC1_FREQ, y                ; make the sound
+   373  115f a200                   ldx #0
+   374                          
+   375                          intro2:
+   376  1161 8e0e90                 stx VIC_VOLUME
+   377                          
+   378  1164 a20c                   ldx #$0C                            ; short delay
+   379  1166 88                 -   dey                                 ;
+   380  1167 d0fd                   bne -                               ;
+   381  1169 ca                     dex                                 ;
+   382  116a d0fa                   bne -                               ;
+   383                          
+   384  116c ae0e90                 ldx VIC_VOLUME                      ; get X back
+   385  116f e8                     inx
+   386  1170 e00f                   cpx #$0F
+   387  1172 d0ed                   bne intro2
+   388                          
+   389  1174 8e0e90                 stx VIC_VOLUME                      ; set the volume to max
+   390                          
+   391  1177 38                     sec                                 ; drop the frequency
+   392  1178 e904                   sbc #04
+   393  117a c9d0                   cmp #$D0                            ; reached 208?
+   394  117c b0de                   bcs intro1                          ; no
    395                          
-   396  11c2 a552                   lda F                               ; check F, has player found the bomb?
-   397  11c4 f003                   beq L6
-   398  11c6 4c0a13                 jmp L40                             ; if so, goto 40
-   399                          
-   400                          ; 6 k = k+1 : if (k/2 <> int(k/2)) goto 8 else if k>600 then 37
-   401                          L6:
-   402  11c9 e63c                   inc K_UNITS                         ; K is stored as tens and units to simplify things
-   403                              
-   404  11cb a53c                   lda K_UNITS
-   405  11cd c90a                   cmp #10
-   406  11cf 9004                   bcc +
-   407  11d1 e63d                   inc K_TENS                          ; K hit 10
-   408  11d3 843c                   sty K_UNITS                         ; K_UNITS gets reset (Y=0)
-   409                          +                     
-   410  11d5 6a                     ror                                 ; check bit 0, if clear it is odd, so go to 8
-   411  11d6 902d                   bcc L8
-   412                          
-   413  11d8 a53d                   lda K_TENS                          ; check if K > 600 
-   414  11da c93c                   cmp #60
-   415  11dc 9003                   bcc L7 
-   416  11de 4cad12                 jmp L37
-   417                          
-   418                          ;======================================================================================
-   419                          ; Ominous ticking
-   420                          ;======================================================================================
-   421                          ; 7 for t = 1 to 2 : poke v, t*4 : poke s+1, 128+k/5 : next : poke s+1, 0
-   422                          L7: 
-   423  11e1 a904                   lda #4                              ; pass 1, t*4 = 4
-   424  11e3 8500                   sta TEMP   
+   396  117e 8c0a90                 sty VIC_OSC1_FREQ                   ; stop the oscillator
+   397                          
+   398                          ; Position player
+   399  1181 a9fc                   lda #<SCREEN_START_ME               ; position player in the middle of screen
+   400  1183 8526                   sta PLAYER_LSB
+   401  1185 a91e                   lda #>SCREEN_START_ME
+   402  1187 8527                   sta PLAYER_MSB
+   403                          
+   404                          ;===================================================================================================
+   405                          ; Main Loop
+   406                          ;===================================================================================================
+   407                          main_loop:
+   408  1189 a5a2                   lda JIFFY_LSB                       ; wait until not an 8th frame
+   409  118b 2907                   and #$07
+   410  118d f0fa                   beq main_loop
+   411                          
+   412  118f a5a2               -   lda JIFFY_LSB                       ; wait until an 8th frame
+   413  1191 2907                   and #$07
+   414  1193 d0fa                   bne -
+   415                          
+   416                          ; clear previous player position
+   417  1195 a920                   lda #CHAR_PATH                      ; first time around OLD_PLAYER is at $0000
+   418  1197 9128                   sta (OLD_PLAYER),y
+   419                          
+   420                          ; clear the colour of that square
+   421  1199 a529                   lda OLD_PLAYER_MSB                  ; add the offset from screen to colour RAM
+   422  119b 18                     clc
+   423  119c 6978                   adc #COLOUR_RAM_OFFSET_MSB
+   424  119e 8506                   sta DST_MSB
    425                          
-   426                          L7_1:
-   427  11e5 8d0e90                 sta VIC_VOLUME                      ; v
+   426  11a0 a528                   lda OLD_PLAYER_LSB                  ; LSB remains the same
+   427  11a2 8505                   sta DST_LSB
    428                          
-   429                              ; pokes+1,128+k/5  - really, come on, give me a break here
-   430                              ; max K is 600, so max k/5 is 120. So range is 128-248
-   431                              
-   432  11e8 a53d                   lda K_TENS                          ; this is K/10
-   433  11ea 0a                     asl                                 ; k/10 -> K/5
-   434  11eb 0980                   ora #$80                            ; add 128
+   429  11a4 a90a                   lda #COLOUR_LIGHTRED                ; set to background colour
+   430  11a6 9105                   sta (DST),y
+   431                          
+   432                          ; set new player position
+   433  11a8 a533                   lda PLAYER_CHARACTER                ; set the direction character
+   434  11aa 9126                   sta (PLAYER),y
    435                          
-   436  11ed 8d0b90                 sta VIC_OSC2_FREQ                   ; s+1
-   437                          
-   438  11f0 a208                   ldx #$08
-   439  11f2 88                 -   dey                                 ; short delay
-   440  11f3 d0fd                   bne -                               ;
-   441  11f5 ca                     dex                                 ;
-   442  11f6 d0fa                   bne -                               ;
-   443                          
-   444  11f8 a908                   lda #8                              ; was TEMP 8 ?
-   445  11fa c500                   cmp TEMP
-   446  11fc f004                   beq L7_2                            ; finished
+   436                          ; set the colour of that square
+   437  11ac a527                   lda PLAYER_MSB                      ; add the offset from screen to colour RAM
+   438  11ae 18                     clc
+   439  11af 6978                   adc #COLOUR_RAM_OFFSET_MSB
+   440  11b1 8506                   sta DST_MSB
+   441                          
+   442  11b3 a526                   lda PLAYER_LSB                      ; LSB remains the same
+   443  11b5 8505                   sta DST_LSB
+   444                          
+   445  11b7 a907                   lda #COLOUR_YELLOW                  ; set player colour yellow
+   446  11b9 9105                   sta (DST),y
    447                          
-   448  11fe 8500                   sta TEMP                            ; no, set it to 8 now
-   449  1200 d0e3                   bne L7_1                            ; branch always
-   450                          
-   451                          L7_2:
-   452  1202 8c0b90                 sty VIC_OSC2_FREQ                   ; s+1 = 0
-   453                          
-   454                          ;======================================================================================
-   455                          ; Check joystick and move
-   456                          ;======================================================================================
-   457                          ; 8 poke d, 127 : p = peek(p2) and 128 : j0 = -(p = 0)
-   458                          ; 9 poke d, 255 : p = peek(p1) : j1 = -((p and 8) = 0) : j2 = -((p and 16) = 0) : j3 = -((p and 4) = 0)
-   459                          ; 10 if j0 then c = 1 : m1 = 62 : goto 14
-   460                          ; 11 if j1 then c = 22 : m1 = 22 : goto 14
-   461                          ; 12 if j2 then c = -1 : m1 = 60 : goto 14
-   462                          ; 13 if j3 then c = -22 : m1 = 30
-   463                          L8:
-   464  1205 a97f                   lda #$7F                            ; set joystick 3 as input
-   465  1207 8d2291                 sta VIA2_DDRB
+   448                          ; has the bomb been found?
+   449  11bb a532                   lda FOUND                           ; check F, has player found the bomb?
+   450  11bd f003                   beq +
+   451  11bf 4cf512                 jmp bomb_found                      ; if so, round is complete
+   452                          
+   453                          ; incrememnt the timer
+   454  11c2 e62e               +   inc TIMER_UNITS                     ; timer is stored as tens and units to simplify things
+   455                          
+   456  11c4 a52e                   lda TIMER_UNITS
+   457  11c6 c90a                   cmp #10
+   458  11c8 9004                   bcc +
+   459  11ca e62f                   inc TIMER_TENS                      ; timer hit 10, increment tens
+   460  11cc 842e                   sty TIMER_UNITS                     ; reset units (Y=0)
+   461                          +
+   462                          
+   463                          ; only tick on alternate cycles
+   464  11ce 6a                     ror                                 ; check bit 0, if clear it is odd, so skip ticking
+   465  11cf 9028                   bcc check_joystick
    466                          
-   467  120a ad2091                 lda VIA2_PORTB                      ; read the port
-   468                          
-   469  120d a2ff                   ldx #$FF
-   470  120f 8e2291                 stx VIA2_DDRB                       ; back to all inputs for keyboard scanning
-   471                              
-   472  1212 2980                   and #$80                            ; mask of the pin
-   473  1214 d006                   bne +                               ; skip if not zero (active)
-   474  1216 a201                   ldx #MOVE_RIGHT                     ; set new direction (was using C)
-   475  1218 a93e                   lda #CHAR_RIGHT                     ; set new character (will get written to M1)
-   476  121a d022                   bne L14
-   477                          +
+   467                          ; odd cycle, how are we doing?
+   468  11d1 a52f                   lda TIMER_TENS                      ; only need to check the tens
+   469  11d3 c93c                   cmp #60
+   470  11d5 9003                   bcc tick                            ; we're ok, kiip ticking
+   471  11d7 4c9d12                 jmp timed_out                       ; timed out, round over
+   472                          
+   473                          ;======================================================================================
+   474                          ; Ominous ticking
+   475                          ;======================================================================================
+   476                          tick:
+   477  11da a904                   lda #4                              ; pass 1, set volume to 4
    478                          
-   479  121c ad1f91                 lda VIA1_PORTA                      ; read port A and set J1,2 and 3 accordingly
-   480  121f aa                     tax                                 ; save value
+   479                          tock:
+   480  11dc 8d0e90                 sta VIC_VOLUME                      ; v
    481                          
-   482  1220 2908                   and #8
-   483  1222 d006                   bne +                               ; skip if not zero (active)
-   484  1224 a216                   ldx #MOVE_DOWN                      ; set new direction (was using C)
-   485  1226 a916                   lda #CHAR_DOWN                      ; set new character (will get written to M1)
-   486  1228 d014                   bne L14
-   487                          +
-   488  122a 8a                     txa                                 ; get back the port reading
-   489  122b 2910                   and #16
-   490  122d d006                   bne +                               ; skip if not zero (active)
-   491  122f a2ff                   ldx #MOVE_LEFT                      ; set new direction (was using C)
-   492  1231 a93c                   lda #CHAR_LEFT                      ; set new character (will get written to M1)
-   493  1233 d009                   bne L14
-   494                          +
-   495  1235 8a                     txa                                 ; get back the port reading
-   496  1236 2904                   and #4
-   497  1238 d034                   bne L16_2                           ; back to start if no movement detected
-   498  123a a2ea                   ldx #MOVE_UP                        ; set new direction (was using C)
-   499  123c a91e                   lda #CHAR_UP                        ; set new character (will get written to M1)
-   500                          
-   501                          ; 14 om = me : me = me+c : c = 0
-   502                          L14:
-   503  123e 8553                   sta M1                              ; store new player direction
-   504                          
-   505  1240 a538                   lda ME_LSB                          ; old me = current me
-   506  1242 853a                   sta OM_LSB
-   507  1244 a539                   lda ME_MSB
-   508  1246 853b                   sta OM_MSB
-   509                          
-   510  1248 8a                     txa                                 ; me=me+c - move me
-   511  1249 1002                   bpl +
-   512  124b c639                   dec ME_MSB                          ; if c is negative, decrement the MSB
-   513  124d 18                 +   clc
-   514  124e 6538                   adc ME_LSB
-   515  1250 8538                   sta ME_LSB
-   516  1252 9002                   bcc +
-   517  1254 e639                   inc ME_MSB
-   518                          +   
-   519                          
-   520                          ; 15 if peek(me) <> 32 and peek(me) <> 42 then me = om
-   521  1256 b138                   lda (ME),y
-   522                          
-   523  1258 c920                   cmp #CHAR_PATH                      ; is it a clear path?
-   524  125a f00c                   beq L16                             ; yes, skip
-   525                          
-   526  125c c92a                   cmp #CHAR_BOMB                      ; is it a bomb?
-   527  125e f008                   beq L16                             ; yes, skip
-   528                          
-   529  1260 a63a                   ldx OM_LSB                          ; me = old me - you can't want into walls
-   530  1262 8638                   stx ME_LSB
-   531  1264 a63b                   ldx OM_MSB
-   532  1266 8639                   stx ME_MSB
+   482                              ; set vic oscillator based on remaining time
+   483                              ; max TIMER_TENS is 60, doubled max is 120.
+   484                              ; Range is 128-248
+   485                          
+   486  11df a52f                   lda TIMER_TENS                      ; get the tens
+   487  11e1 0a                     asl                                 ; double it
+   488  11e2 0980                   ora #$80                            ; add 128
+   489                          
+   490  11e4 8d0b90                 sta VIC_OSC2_FREQ                   ; set the frequency
+   491                          
+   492  11e7 a208                   ldx #$08
+   493  11e9 88                 -   dey                                 ; short delay
+   494  11ea d0fd                   bne -                               ;
+   495  11ec ca                     dex                                 ;
+   496  11ed d0fa                   bne -                               ;
+   497                          
+   498  11ef a908                   lda #8                              ; was VIC_VOLUME 8 already ?
+   499  11f1 cd0e90                 cmp VIC_VOLUME
+   500  11f4 d0e6                   bne tock                            ; no, loop again, this time at volume 8
+   501                          
+   502  11f6 8c0b90                 sty VIC_OSC2_FREQ                   ; disable the oscillator (Y=0)
+   503                          
+   504                          ;======================================================================================
+   505                          ; Check joystick and move
+   506                          ;======================================================================================
+   507                          check_joystick:
+   508  11f9 ad1f91                 lda VIA1_PORTA                      ; read port A where three of the joystick pins are
+   509  11fc aa                     tax                                 ; save value
+   510                          
+   511  11fd 2908                   and #8
+   512  11ff d004                   bne +                               ; skip if not zero (active)
+   513  1201 a203                   ldx #DOWN                           ; set new direction
+   514  1203 d025                   bne move_player                     ; jump always
+   515                          +
+   516  1205 8a                     txa                                 ; get back the port reading
+   517  1206 2910                   and #16
+   518  1208 d004                   bne +                               ; skip if not zero (active)
+   519  120a a202                   ldx #LEFT                           ; set new direction
+   520  120c d01c                   bne move_player
+   521                          +
+   522  120e 8a                     txa                                 ; get back the port reading
+   523  120f 2904                   and #4
+   524  1211 d004                   bne +                               ; skip if not zero (active)
+   525  1213 a201                   ldx #UP                             ; set new direction
+   526  1215 d013                   bne move_player
+   527                          
+   528                          +
+   529  1217 a97f                   lda #$7F                            ; set joystick3 as input
+   530  1219 8d2291                 sta VIA2_DDRB
+   531                          
+   532  121c ad2091                 lda VIA2_PORTB                      ; read the port
    533                          
-   534                          ; 16 if peek(me) = 42 then f = 1 : goto 5
-   535                          L16:
-   536  1268 c92a                   cmp #CHAR_BOMB                      ; is it a bomb?
-   537  126a d005                   bne L17                             ; no, skip
-   538                          
-   539  126c e652                   inc F                               ; it is a bomb, set found
-   540                          L16_2:    
-   541  126e 4c9111                 jmp L5
-   542                          
-   543                              
-   544                          ; 17 if (me>7921) goto 18 else sys 887 : me = me+22 : goto 5
-   545                          L17:
-   546  1271 a539                   lda ME_MSB                           ; if me>1EF1 goto 18
-   547  1273 c91e                   cmp #>SCREEN_LINE_ABOVE_ME
-   548  1275 d004                   bne +
-   549  1277 a538                   lda ME_LSB
-   550  1279 c9f1                   cmp #<SCREEN_LINE_ABOVE_ME
-   551                          +
-   552  127b b011                   bcs L18
-   553                          
-   554  127d 208e13                 jsr sys887                          ; scroll down
-   555                          
-   556  1280 a538                   lda ME_LSB                          ; me += 22 
-   557  1282 18                     clc
-   558  1283 6916                   adc #MOVE_DOWN
-   559  1285 8538                   sta ME_LSB
-   560  1287 9002                   bcc +
-   561  1289 e639                   inc ME_MSB
-   562                          +
-   563  128b 4c9111                 jmp L5
-   564                          
-   565                          ; 18 if (me<7944) goto 5 else sys 905 : me = me-22 : goto 5
-   566                          L18
-   567  128e a539                   lda ME_MSB                          ; is ME < 1F08
-   568  1290 c91f                   cmp #>SCREEN_LINE_BELOW_ME
-   569  1292 d004                   bne +
-   570  1294 a538                   lda ME_LSB
-   571  1296 c908                   cmp #<SCREEN_LINE_BELOW_ME
-   572                          +
-   573  1298 9010                   bcc +
-   574                          
-   575  129a 209413                 jsr sys905                          ; scroll up
-   576                          
-   577  129d a538                   lda ME_LSB                          ; me += -22
-   578  129f c639                   dec ME_MSB
-   579  12a1 18                     clc
-   580  12a2 69ea                   adc #MOVE_UP
-   581  12a4 8538                   sta ME_LSB
-   582  12a6 9002                   bcc +
-   583  12a8 e639                   inc ME_MSB
-   584                          +
-   585  12aa 4c9111                 jmp L5
-   586                          
-   587                          ;===================================================================================================
-   588                          ; Timeout, bomb explodes
-   589                          ;===================================================================================================
-   590                          ; 37 poke v, 15 : for t = 255 to 127 step -2 : poke s, t : poke v-9, 255 : for g = 1 to 10 : next
-   591                          L37:
-   592  12ad a90f                   lda #15                             ; full volume
-   593  12af 8d0e90                 sta VIC_VOLUME
-   594                          
-   595  12b2 a2ff                   ldx #$FF
-   596                          L37_1:
-   597  12b4 8e0a90                 stx VIC_OSC1_FREQ                   ; s = t
+   534  121f a2ff                   ldx #$FF
+   535  1221 8e2291                 stx VIA2_DDRB                       ; back to all inputs for keyboard scanning
+   536                          
+   537  1224 2980                   and #$80                            ; mask of the pin
+   538  1226 d033                   bne back_to_main_loop               ; nothing moving, back to main loop
+   539  1228 a200                   ldx #RIGHT                          ; set new direction
+   540                          
+   541                          ; try to move the player
+   542                          move_player:
+   543  122a a526                   lda PLAYER_LSB                      ; save the old location
+   544  122c 8528                   sta OLD_PLAYER_LSB
+   545  122e a527                   lda PLAYER_MSB
+   546  1230 8529                   sta OLD_PLAYER_MSB
+   547                          
+   548  1232 b518                   lda CHAR_DIRECTION,x                ; get new player direction character
+   549  1234 8533                   sta PLAYER_CHARACTER
+   550                          
+   551  1236 b510                   lda DIRECTION,x                     ; get new player direction
+   552  1238 1002                   bpl +
+   553  123a c627                   dec PLAYER_MSB                      ; if direction is negative, decrement the MSB
+   554  123c 18                 +   clc
+   555  123d 6526                   adc PLAYER_LSB
+   556  123f 8526                   sta PLAYER_LSB
+   557  1241 9002                   bcc +
+   558  1243 e627                   inc PLAYER_MSB
+   559                          +
+   560                          
+   561                          ; check new location
+   562  1245 b126                   lda (PLAYER),y
+   563                          
+   564  1247 c920                   cmp #CHAR_PATH                      ; is it a clear path?
+   565  1249 f013                   beq ok_to_move                      ; yes, that's ok
+   566                          
+   567  124b c92a                   cmp #CHAR_BOMB                      ; is it a bomb?
+   568  124d d004                   bne must_be_a_wall                  ; no
+   569  124f e632                   inc FOUND                           ; yes, set found
+   570  1251 d008                   bne back_to_main_loop               ; back to the main loop to tidy up first
+   571                          
+   572                          must_be_a_wall:
+   573  1253 a528                   lda OLD_PLAYER_LSB                  ; me = old me - you can't want into walls
+   574  1255 8526                   sta PLAYER_LSB
+   575  1257 a529                   lda OLD_PLAYER_MSB
+   576  1259 8527                   sta PLAYER_MSB
+   577                          
+   578                          back_to_main_loop:
+   579  125b 4c8911                 jmp main_loop
+   580                          
+   581                          ; it is OK to move
+   582                          ok_to_move:
+   583                          
+   584                          ; check if we need to scroll down now
+   585  125e a527                   lda PLAYER_MSB                      ; is the player on the line above centre?
+   586  1260 c91e                   cmp #>SCREEN_LINE_ABOVE_ME
+   587  1262 d004                   bne +
+   588  1264 a526                   lda PLAYER_LSB
+   589  1266 c9f1                   cmp #<SCREEN_LINE_ABOVE_ME
+   590                          +
+   591  1268 b008                   bcs check_scroll_up
+   592                          
+   593                          ; yes, move the offset up and the player down
+   594  126a a9ea                   lda #MOVE_UP                        ; offset = offset - 1 row
+   595  126c c62b                   dec OFFSET_MSB                      ; pre-decrement MSB for subtraction
+   596  126e a216                   ldx #MOVE_DOWN                      ; player = player + 1 row
+   597  1270 d012                   bne scroll                          ; jump always
    598                          
-   599  12b7 a9ff                   lda #$FF
-   600  12b9 8d0590                 sta VIC_ADDRESSING                  ; v-9 = 255
-   601                          
-   602  12bc a209                   ldx #$09                            ; short delay
-   603  12be 88                 -   dey                                 ;
-   604  12bf d0fd                   bne -                               ;
-   605  12c1 ca                     dex                                 ;
-   606  12c2 d0fa                   bne -                               ;
+   599                          check_scroll_up:
+   600  1272 a527                   lda PLAYER_MSB                      ; is the player on the line below centre?
+   601  1274 c91f                   cmp #>SCREEN_LINE_BELOW_ME
+   602  1276 d004                   bne +
+   603  1278 a526                   lda PLAYER_LSB
+   604  127a c908                   cmp #<SCREEN_LINE_BELOW_ME
+   605                          +
+   606  127c 90dd                   bcc back_to_main_loop               ; no
    607                          
-   608                          ; 38 poke v-9, 242 : for g = 1 to 10 : next : poke v-9, 240 : next : poke v-1, 220 : for g = 15 to 0 step -.05
-   609  12c4 a9f2                   lda #$F2
-   610  12c6 8d0590                 sta VIC_ADDRESSING                  ; v-9 = 242
-   611                          
-   612  12c9 a209                   ldx #$09                            ; short delay
-   613  12cb 88                 -   dey                                 ;
-   614  12cc d0fd                   bne -                               ;
-   615  12ce ca                     dex                                 ;
-   616  12cf d0fa                   bne -                               ;
-   617                          
-   618  12d1 ae0a90                 ldx VIC_OSC1_FREQ                   ; get X back
-   619                          
-   620  12d4 a9f0                   lda #$F0
-   621  12d6 8d0590                 sta VIC_ADDRESSING                  ; v-9 = 240
-   622                          
-   623  12d9 ca                     dex                                 ; t=t-2
-   624  12da ca                     dex
-   625  12db 30d7                   bmi L37_1                           ; loop when t > 127
-   626                          
-   627                              ; now the explosion
-   628                          
-   629  12dd a9dc                   lda #$DC
-   630  12df 8d0d90                 sta VIC_NOISE_FREQ                  ; v-1 = 220
-   631                          
-   632                          ; for g = 15 to 0 step -.05   oh no, what?
+   608                          ; yes, move the offset down and the player up
+   609  127e a916                   lda #MOVE_DOWN                      ; offset = offset + 1 row
+   610  1280 a2ea                   ldx #MOVE_UP                        ; player = player - 1 row
+   611  1282 c627                   dec PLAYER_MSB                      ; pre-decrement MSB for subtraction
+   612                          
+   613                          ; adjust offset view
+   614                          scroll:
+   615  1284 18                     clc                                 ; a contains + or - 1 row
+   616  1285 652a                   adc OFFSET_LSB
+   617  1287 852a                   sta OFFSET_LSB
+   618  1289 9002                   bcc +
+   619  128b e62b                   inc OFFSET_MSB
+   620                          +
+   621                          
+   622                          ; move player back to the centre line
+   623  128d 8a                     txa                                 ; x contains + or - 1 row
+   624  128e 18                     clc
+   625  128f 6526                   adc PLAYER_LSB
+   626  1291 8526                   sta PLAYER_LSB
+   627  1293 9002                   bcc +
+   628  1295 e627                   inc PLAYER_MSB
+   629                          +
+   630                          
+   631                          ; redraw the screen
+   632  1297 207913                 jsr draw_screen
    633                          
-   634                          ; 39 poke v, g : poke v+1, g*10 : next : poke v-1, 0 : poke v+1, 238 : gosub 42 : run
-   635                          L39:
-   636  12e2 a996                   lda #$96                            ; v+1 = g*10
-   637  12e4 8d0f90                 sta VIC_BORDER            
-   638                          
-   639  12e7 a90f                   lda #$0F                            ; v = g
-   640  12e9 8d0e90                 sta VIC_VOLUME
-   641                          
-   642  12ec a20a                   ldx #$0A                            ; loop 10 times
-   643                          
-   644  12ee 88                 -   dey                                 ; delay
-   645  12ef d0fd                   bne -
-   646                          
-   647  12f1 ce0f90                 dec VIC_BORDER                      ; v+1 = g*10
-   648  12f4 ca                     dex
-   649  12f5 d0f7                   bne -
-   650                          
-   651  12f7 ce0e90                 dec VIC_VOLUME                      ; v = g
-   652  12fa d0f2                   bne -
-   653                          
-   654  12fc 8c0d90                 sty VIC_NOISE_FREQ                  ; v-1 = 0 
-   655                          
-   656  12ff a9ee                   lda #$EE                            ; v+1 = 238
-   657  1301 8d0f90                 sta VIC_BORDER            
+   634                          ; back to the start
+   635  129a 4c8911                 jmp main_loop
+   636                          
+   637                          
+   638                          ;===================================================================================================
+   639                          ; Timeout, bomb explodes
+   640                          ;===================================================================================================
+   641                          timed_out:
+   642  129d a90f                   lda #$0F                            ; set full volume
+   643  129f 8d0e90                 sta VIC_VOLUME
+   644                          
+   645  12a2 a2ff                   ldx #$FF                            ; start at 255
+   646                          fizz:
+   647  12a4 8e0a90                 stx VIC_OSC1_FREQ                   ; set the frequency
+   648                          
+   649                          ; change the addressing to mess up the screen
+   650  12a7 a9ff                   lda #$FF
+   651  12a9 8d0590                 sta VIC_ADDRESSING
+   652                          
+   653  12ac a209                   ldx #$09                            ; short delay
+   654  12ae 88                 -   dey                                 ;
+   655  12af d0fd                   bne -                               ;
+   656  12b1 ca                     dex                                 ;
+   657  12b2 d0fa                   bne -                               ;
    658                          
-   659  1304 205213                 jsr L42                             ; display "ROUND R, PRESS F7"
-   660                          
-   661  1307 4c1710                 jmp L1                              ; restart
+   659                          ; change the addressing to mess up the screen
+   660  12b4 a9f2                   lda #$F2
+   661  12b6 8d0590                 sta VIC_ADDRESSING                  ; v-9 = 242
    662                          
-   663                          ;===================================================================================================
-   664                          ; Success
-   665                          ;===================================================================================================
-   666                          
-   667                          ; 40 poke tb, 32 : poke v-1, 253 : for g = 30 to 0 step -.15 : poke v, g/2 : next : x = x+50 : if x>449 then x = 450
-   668                          L40:
-   669  130a a920                   lda #CHAR_PATH                     ; dispose of the timebomb
-   670  130c 9136                   sta (TB),y
+   663  12b9 a209                   ldx #$09                            ; short delay
+   664  12bb 88                 -   dey                                 ;
+   665  12bc d0fd                   bne -                               ;
+   666  12be ca                     dex                                 ;
+   667  12bf d0fa                   bne -                               ;
+   668                          
+   669  12c1 a9f0                   lda #$F0
+   670  12c3 8d0590                 sta VIC_ADDRESSING                  ; v-9 = 240
    671                          
-   672  130e a9fd                   lda #$FD
-   673  1310 8d0d90                 sta VIC_NOISE_FREQ                  ; v-1 = 253
-   674                          
-   675                              ; for g = 30 to 0 step -.15  oh come on, give me a break
-   676  1313 a20f                   ldx #$0F                            ; g = 30, x = g/2 = 15
-   677                          
-   678                          L40_1:    
-   679  1315 8e0e90                 stx VIC_VOLUME                      ; v = g/2 = x
-   680                          
-   681  1318 a235                   ldx #$35                            ; delay
-   682  131a 88                 -   dey                                 ;
-   683  131b d0fd                   bne -                               ;
-   684  131d ca                     dex                                 ;
-   685  131e d0fa                   bne -                               ;
+   672  12c6 ae0a90                 ldx VIC_OSC1_FREQ                   ; what's the frequency Kenneth?
+   673  12c9 ca                     dex                                 ; reduce it
+   674  12ca ca                     dex
+   675  12cb 30d7                   bmi fizz                            ; loop when until < 128
+   676                          
+   677                              ; now the explosion
+   678                          
+   679  12cd a9dc                   lda #$DC                            ; set the noise frequency
+   680  12cf 8d0d90                 sta VIC_NOISE_FREQ
+   681                          
+   682  12d2 a996                   lda #$96                            ; change the colours
+   683  12d4 8d0f90                 sta VIC_BORDER
+   684                          
+   685  12d7 a20a                   ldx #$0A                            ; loop 10 times
    686                          
-   687  1320 ae0e90                 ldx VIC_VOLUME                      ; get X back
-   688                          
-   689  1323 ca                     dex
-   690  1324 d0ef                   bne L40_1
-   691                          
-   692  1326 18                     clc
-   693  1327 a53f                   lda X_TENS                          ; x = x+50
-   694  1329 6905                   adc #$05
-   695  132b 853f                   sta X_TENS
-   696                          
-   697  132d c92d                   cmp #$2D                            ; x > 450 ?
-   698  132f 9004                   bcc L41
-   699                          
-   700  1331 a92d                   lda #$2D                            ; x = 450
-   701  1333 853f                   sta X_TENS                          ; X_UNITS is always 0
-   702                          
-   703                          ; 41 poke v-1, 0 : f = 0 : k = x : r = r+1 : gosub 42 : goto 27
-   704                          L41:
-   705  1335 8c0d90                 sty VIC_NOISE_FREQ                  ; v-1 = 0
-   706                          
-   707  1338 8452                   sty F                               ; f = 0
-   708                          
-   709  133a a53f                   lda X_TENS                          ; k = x, start K counter at X
-   710  133c 853d                   sta K_TENS
-   711  133e 843c                   sty K_UNITS                         ; X_UNITS is always 0
-   712                              
-   713  1340 e640                   inc R_UNITS                         ; r = r+1
-   714  1342 a540                   lda R_UNITS
-   715  1344 c90a                   cmp #10
-   716  1346 9004                   bcc +
-   717  1348 8440                   sty R_UNITS                         ; if R_UNITS>9 then R_UNITS=0 R_TENS++
-   718  134a e641                   inc R_TENS
-   719                          +  
-   720  134c 205213                 jsr L42                             ; display "ROUND R, PRESS F7"
-   721                          
-   722  134f 4c1911                 jmp L27                             ; next round
-   723                          
-   724                          ;===================================================================================================
-   725                          ; Print ROUND R - PRESS F7
-   726                          ;===================================================================================================
-   727                          ; 42 print "{home}round" r "{right} " : print "{down}press f7 " : a$ = "" : get a$ : if (a$ <> "{f7}") goto 42 else return
-   728                          L42:
-   729  1352 a207                   ldx #TEXT_LEN-1                     ; was 2x WriteColourString Macro               
-   730  1354 bde613             -   lda TEXT_ROUND_x,x
-   731  1357 9d001e                 sta SCREEN_RAM_LINE_00,x
-   732  135a bdee13                 lda TEXT_PRESS_F7,x
-   733  135d 9d2c1e                 sta SCREEN_RAM_LINE_02,x    
-   734  1360 a906                   lda #COLOUR_BLUE
-   735  1362 9d0096                 sta COLOUR_RAM_LINE_00,x
-   736  1365 9d2c96                 sta COLOUR_RAM_LINE_02,x
-   737  1368 ca                     dex 
-   738  1369 10e9                   bpl -
+   687                          flash:
+   688  12d9 88                     dey                                 ; delay
+   689  12da d0fd                   bne flash
+   690                          
+   691  12dc ce0f90                 dec VIC_BORDER                      ; flash the border colour
+   692  12df ca                     dex
+   693  12e0 d0f7                   bne flash
+   694                          
+   695  12e2 ce0e90                 dec VIC_VOLUME                      ; reduce the colume
+   696  12e5 d0f2                   bne flash
+   697                          
+   698                          ; silence
+   699  12e7 8c0d90                 sty VIC_NOISE_FREQ                  ; stop the noice
+   700                          
+   701  12ea a9ee                   lda #$EE                            ; back to normal
+   702  12ec 8d0f90                 sta VIC_BORDER
+   703                          
+   704  12ef 203d13                 jsr end_of_round                    ; display "ROUND R, PRESS F7"
+   705                          
+   706  12f2 4c1710                 jmp start                           ; restart with a new maze (since you blew the old one up)
+   707                          
+   708                          ;===================================================================================================
+   709                          ; Success
+   710                          ;===================================================================================================
+   711                          bomb_found:
+   712  12f5 a920                   lda #CHAR_PATH                      ; dispose of the timebomb
+   713  12f7 9124                   sta (TIMEBOMB),y
+   714                          
+   715  12f9 a9fd                   lda #$FD
+   716  12fb 8d0d90                 sta VIC_NOISE_FREQ                  ; defusing noise
+   717                          
+   718  12fe a20f                   ldx #$0F                            ; g = 30, x = g/2 = 15
+   719                          
+   720                          defuse:
+   721  1300 8e0e90                 stx VIC_VOLUME                      ; v = g/2 = x
+   722                          
+   723  1303 a235                   ldx #$35                            ; delay
+   724  1305 88                 -   dey                                 ;
+   725  1306 d0fd                   bne -                               ;
+   726  1308 ca                     dex                                 ;
+   727  1309 d0fa                   bne -                               ;
+   728                          
+   729  130b ae0e90                 ldx VIC_VOLUME                      ; get X back
+   730                          
+   731  130e ca                     dex
+   732  130f d0ef                   bne defuse
+   733                          
+   734                          ; reduce the available time for the next round
+   735  1311 18                     clc
+   736  1312 a535                   lda PENALTY                         ; add 5 seconds penalty
+   737  1314 6905                   adc #$05
+   738  1316 8535                   sta PENALTY
    739                          
-   740  136b a541                   lda R_TENS
-   741  136d f010                   beq L42_1
-   742                          
-   743                              ; double digit
-   744  136f 18                     clc    
-   745  1370 6930                   adc #$30                            ; A = R+30  (0->"0")
-   746  1372 8d061e                 sta SCREEN_RAM + 6                 
-   747                          
-   748  1375 a540                   lda R_UNITS
-   749  1377 18                     clc
-   750  1378 6930                   adc #$30                            ; A = R+30  (0->"0")
-   751  137a 8d071e                 sta SCREEN_RAM + 7                  
-   752  137d d008                   bne L42_2                           ; branch always
-   753                          
-   754                          L42_1:
-   755                              ; single digit
-   756  137f a540                   lda R_UNITS
-   757  1381 18                     clc
-   758  1382 6930                   adc #$30                            ; A = R+30  (0->"0")
-   759  1384 8d061e                 sta SCREEN_RAM + 6                  
-   760                          
-   761                          L42_2:        
-   762  1387 a5c5                   lda LAST_KEY                        ; check last key pressed
-   763  1389 c93f                   cmp #KEY_F7                         ; was it F7?
-   764  138b d0fa                   bne L42_2                           ; no, keep checking
-   765                              
-   766  138d 60                     rts                                 ; yes, return
-   767                          
-   768                          ;===================================================================================================
-   769                          ; SYS 887 Scroll screen up
-   770                          ;===================================================================================================
-   771                          sys887:
-   772  138e c643                   dec OFFSET_MSB                      ; pre-decrement as this is a subtraction
-   773  1390 a9ea                   lda #MOVE_UP                        ; offset = offset - 22
-   774  1392 d002                   bne +
+   740  1318 c92d                   cmp #$2D                            ; have we gone too far?
+   741  131a 9004                   bcc +
+   742  131c a92d                   lda #$2D                            ; limit the maximum penalty
+   743  131e 8535                   sta PENALTY
+   744                          +
+   745                          
+   746  1320 8c0d90                 sty VIC_NOISE_FREQ                  ; stop the noise
+   747  1323 8432                   sty FOUND                           ; the bomb has not been found
+   748                          
+   749  1325 a535                   lda PENALTY                         ; start the timer, with the penalty
+   750  1327 852f                   sta TIMER_TENS
+   751  1329 842e                   sty TIMER_UNITS
+   752                          
+   753                          ; increment the round number
+   754  132b e62c                   inc ROUND_UNITS
+   755  132d a52c                   lda ROUND_UNITS
+   756  132f c90a                   cmp #10                             ; has it reached 10?
+   757  1331 9004                   bcc +
+   758  1333 842c                   sty ROUND_UNITS                     ; clear and increment the 10s count
+   759  1335 e62d                   inc ROUND_TENS
+   760                          +
+   761  1337 203d13                 jsr end_of_round                    ; display "ROUND R, PRESS F7"
+   762                          
+   763  133a 4c1711                 jmp next_round                      ; next round
+   764                          
+   765                          ;===================================================================================================
+   766                          ; end of round, print ROUND R - PRESS F7
+   767                          ;===================================================================================================
+   768                          end_of_round:
+   769  133d a207                   ldx #TEXT_LEN-1                     ; write out two 8 character strings
+   770                          
+   771  133f bdc013             -   lda TEXT_ROUND_x,x                  ; "ROUND   "
+   772  1342 9d001e                 sta SCREEN_RAM_LINE_00,x
+   773  1345 bdc813                 lda TEXT_PRESS_F7,x                 ; "PRESS F7"
+   774  1348 9d2c1e                 sta SCREEN_RAM_LINE_02,x
    775                          
-   776                          ;===================================================================================================
-   777                          ; SYS 905 Scroll screen down
-   778                          ;===================================================================================================
-   779                          sys905:
-   780  1394 a916                   lda #MOVE_DOWN                      ; offset = offset + 22
-   781                          +
-   782  1396 18                     clc
-   783  1397 6542                   adc OFFSET_LSB
-   784  1399 8542                   sta OFFSET_LSB
-   785  139b 9002                   bcc +
-   786  139d e643                   inc OFFSET_MSB
-   787                          +
-   788                          
-   789                          ;===================================================================================================
-   790                          ; SYS 923 redraw screen
-   791                          ;===================================================================================================
-   792                          sys923:
-   793  139f a542                   lda OFFSET_LSB                      ; set the source (the map bitmap)
-   794  13a1 8508                   sta SRC_LSB
-   795  13a3 a543                   lda OFFSET_MSB
-   796  13a5 8509                   sta SRC_MSB
+   776  134b a906                   lda #COLOUR_BLUE                    ; both blue
+   777  134d 9d0096                 sta COLOUR_RAM_LINE_00,x
+   778  1350 9d2c96                 sta COLOUR_RAM_LINE_02,x
+   779                          
+   780  1353 ca                     dex
+   781  1354 10e9                   bpl -
+   782                          
+   783                          ; display the round number
+   784  1356 a52d                   lda ROUND_TENS                      ; any tens?
+   785  1358 f010                   beq single
+   786                          
+   787                              ; double digit
+   788  135a 18                     clc                                 ; make printable (0->"0")
+   789  135b 6930                   adc #$30
+   790  135d 8d061e                 sta SCREEN_RAM + 6
+   791                          
+   792  1360 a52c                   lda ROUND_UNITS
+   793  1362 18                     clc                                 ; make printable (0->"0")
+   794  1363 6930                   adc #$30
+   795  1365 8d071e                 sta SCREEN_RAM + 7
+   796  1368 d008                   bne check_key                       ; branch always
    797                          
-   798  13a7 840a                   sty DST_LSB                         ; set the destination to the screen at 1E00    
-   799  13a9 a91e                   lda #>SCREEN_RAM
-   800  13ab 850b                   sta DST_MSB
-   801                          
-   802  13ad b108               -   lda (SRC),y                         ; copy character
-   803  13af 910a                   sta (DST),y
+   798                          single:
+   799                              ; single digit
+   800  136a a52c                   lda ROUND_UNITS
+   801  136c 18                     clc                                 ; make printable (0->"0")
+   802  136d 6930                   adc #$30
+   803  136f 8d061e                 sta SCREEN_RAM + 6
    804                          
-   805  13b1 e608                   inc SRC_LSB
-   806  13b3 d010                   bne +
-   807  13b5 e609                   inc SRC_MSB
-   808  13b7 a509                   lda SRC_MSB
-   809  13b9 c91e                   cmp #$1E                            ; check for end of map
-   810  13bb d008                   bne +
-   811  13bd a9cc                   lda #<MAZE_START_OFFSET             ; reset source to top starting offset
-   812  13bf 8508                   sta SRC_LSB
-   813  13c1 a91c                   lda #>MAZE_START_OFFSET
-   814  13c3 8509                   sta SRC_MSB
-   815                          
-   816  13c5 e60a               +   inc DST_LSB
-   817  13c7 d0e4                   bne -
-   818  13c9 e60b                   inc DST_MSB
-   819  13cb a50b                   lda DST_MSB                         ; check for end of screen RAM
-   820  13cd c920                   cmp #$20                
-   821  13cf d0dc                   bne -                               ; no finished yet, continue
-   822                          
-   823  13d1 60                     rts
+   805                          check_key:
+   806  1372 a5c5                   lda LAST_KEY                        ; check last key pressed
+   807  1374 c93f                   cmp #KEY_F7                         ; was it F7?
+   808  1376 d0fa                   bne check_key                       ; no, keep checking
+   809                          
+   810  1378 60                     rts                                 ; yes, return
+   811                          
+   812                          ;===================================================================================================
+   813                          ; redraw the screen
+   814                          ;===================================================================================================
+   815                          draw_screen:
+   816  1379 a52a                   lda OFFSET_LSB                      ; set the source (offset into the map bitmap)
+   817  137b 8503                   sta SRC_LSB
+   818  137d a52b                   lda OFFSET_MSB
+   819  137f 8504                   sta SRC_MSB
+   820                          
+   821  1381 8405                   sty DST_LSB                         ; set the destination to the screen RAM
+   822  1383 a91e                   lda #>SCREEN_RAM
+   823  1385 8506                   sta DST_MSB
    824                          
-   825                          ;======================================================================================
-   826                          ; Pseudo-random-number generator. You can get 8-bit
-   827                          ; random numbers in A or 16-bit numbers from the zero
-   828                          ; page addresses. Leaves X/Y unchanged.
-   829                          ;
-   830                          ; (36 clock cycles)
-   831                          ;
-   832                          ; See
-   833                          ; https://web.archive.org/web/20250328001550/https://codebase64.org/doku.php?id=base:16bit_xorshift_random_generator
-   834                          ; and
-   835                          ; https://github.com/markgbeckett/pet/tree/main/examples
-   836                          ;======================================================================================
-   837                          RAND16:
-   838  13d2 a511                   lda SEED_MSB                        ; (3)
-   839  13d4 4a                     lsr			                        ; (2)
-   840  13d5 a510                   lda SEED_LSB	                    ; (3)
-   841  13d7 6a                     ror			                        ; (2)
-   842  13d8 4511                   eor SEED_MSB	                    ; (3)
-   843  13da 8511                   sta SEED_MSB	                    ; (3) high part of x ^= x << 7 done
-   844  13dc 6a                     ror             	                ; (2) A has now x >> 9 and high bit comes from low byte
-   845  13dd 4510                   eor SEED_LSB	                    ; (3)
-   846  13df 8510                   sta SEED_LSB	                    ; (3) x ^= x >> 9 and the low part of x ^= x << 7 done
-   847  13e1 4511                   eor SEED_MSB	                    ; (3)
-   848  13e3 8511                   sta SEED_MSB	                    ; (3) x ^= x << 8 done
-   849                          
-   850  13e5 60                     rts			                        ; (6)
-   851                          
-   852                          ;======================================================================================
-   853                          ; Strings
-   854                          ;======================================================================================
-   855                          
-   856                          TEXT_ROUND_x:
-   857  13e6 120f150e04202020       !scr    "round   "
-   858                          
-   859                          TEXT_PRESS_F7:
-   860  13ee 1012051313200637       !scr    "press f7"
-   861                          
-   862                          TEXT_LEN  = 8
-   863                          
+   825  1387 b103               -   lda (SRC),y                         ; copy character
+   826  1389 9105                   sta (DST),y
+   827                          
+   828  138b e603                   inc SRC_LSB                         ; move the source pointer
+   829  138d d010                   bne +
+   830  138f e604                   inc SRC_MSB
+   831  1391 a504                   lda SRC_MSB                         ; at the end?
+   832  1393 c91d                   cmp #>MAZE_END+1
+   833  1395 d008                   bne +
+   834                          
+   835  1397 a9cc                   lda #<MAZE_START_OFFSET             ; end of maze, duplicate the end section again
+   836  1399 8503                   sta SRC_LSB
+   837  139b a91b                   lda #>MAZE_START_OFFSET
+   838  139d 8504                   sta SRC_MSB
+   839                          
+   840  139f e605               +   inc DST_LSB                         ; move the destination pointer
+   841  13a1 d0e4                   bne -
+   842  13a3 e606                   inc DST_MSB
+   843  13a5 a506                   lda DST_MSB                         ; check for end of screen RAM
+   844  13a7 c920                   cmp #>END_OF_SCREEN_RAM+1
+   845  13a9 d0dc                   bne -                               ; not finished yet, continue
+   846                          
+   847  13ab 60                     rts
+   848                          
+   849                          ;======================================================================================
+   850                          ; Pseudo-random-number generator. You can get 8-bit random numbers in A
+   851                          ; or 16-bit numbers from the zero page addresses. Leaves X/Y unchanged.
+   852                          ;
+   853                          ; (36 clock cycles)
+   854                          ;
+   855                          ; See
+   856                          ; https://web.archive.org/web/20250328001550/https://codebase64.org/doku.php?id=base:16bit_xorshift_random_generator
+   857                          ; and
+   858                          ; https://github.com/markgbeckett/pet/tree/main/examples
+   859                          ;======================================================================================
+   860                          RAND16:
+   861  13ac a508                   lda SEED_MSB                        ; (3)
+   862  13ae 4a                     lsr			                        ; (2)
+   863  13af a507                   lda SEED_LSB	                    ; (3)
+   864  13b1 6a                     ror			                        ; (2)
+   865  13b2 4508                   eor SEED_MSB	                    ; (3)
+   866  13b4 8508                   sta SEED_MSB	                    ; (3) high part of x ^= x << 7 done
+   867  13b6 6a                     ror             	                ; (2) A has now x >> 9 and high bit comes from low byte
+   868  13b7 4507                   eor SEED_LSB	                    ; (3)
+   869  13b9 8507                   sta SEED_LSB	                    ; (3) x ^= x >> 9 and the low part of x ^= x << 7 done
+   870  13bb 4508                   eor SEED_MSB	                    ; (3)
+   871  13bd 8508                   sta SEED_MSB	                    ; (3) x ^= x << 8 done
+   872                          
+   873  13bf 60                     rts			                        ; (6)
+   874                          
+   875                          ;======================================================================================
+   876                          ; Strings
+   877                          ;======================================================================================
+   878                          TEXT_ROUND_x:
+   879  13c0 120f150e04202020       !scr    "round   "
+   880                          
+   881                          TEXT_PRESS_F7:
+   882  13c8 1012051313200637       !scr    "press f7"
+   883                          
+   884                          TEXT_LEN  = 8
+   885                          
+   886                          
